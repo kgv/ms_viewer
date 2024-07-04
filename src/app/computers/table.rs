@@ -48,6 +48,13 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
                 trace!(lazy_data_frame =? lazy_data_frame.clone().collect());
                 lazy_data_frame = lazy_data_frame
                     .explode(["MassToCharge", "Signal"])
+                    .group_by([col("RetentionTime"), col("MassToCharge").round(0)])
+                    .agg([col("Signal")])
+                    .explode(["Signal"])
+                    .sort_by_exprs(
+                        [col("MassToCharge"), col("RetentionTime")],
+                        Default::default(),
+                    )
                     .group_by([col("MassToCharge")])
                     .agg([col("RetentionTime"), col("Signal")])
                     .with_columns([

@@ -280,7 +280,7 @@ impl TableTab<'_> {
         let total_rows = data_frame.height();
         let retention_time = data_frame["RetentionTime"].i32()?;
         let mass_to_charge = data_frame["MassToCharge"].f32()?;
-        let signal = data_frame["Signal"].i16()?;
+        let signal = data_frame["Signal"].u16()?;
         TableBuilder::new(ui)
             .cell_layout(Layout::centered_and_justified(Direction::LeftToRight))
             .columns(Column::auto(), COLUMN_COUNT)

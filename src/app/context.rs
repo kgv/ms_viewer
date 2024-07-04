@@ -1,4 +1,5 @@
 use crate::time_units::TimeUnits;
+use indexmap::IndexMap;
 use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,7 @@ pub(crate) struct Settings {
     pub(crate) explode: bool,
     pub(crate) filter_null: bool,
     pub(crate) legend: bool,
+    pub(crate) visible: Option<bool>,
     pub(crate) sort: Sort,
     pub(crate) mass_to_charge: MassToCharge,
     pub(crate) retention_time: RetentionTime,

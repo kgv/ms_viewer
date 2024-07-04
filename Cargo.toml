@@ -17,16 +17,19 @@ egui_dock = { version = "0.12.0", features = ["serde"] }
 egui_ext = { git = "https://github.com/kgv/egui_ext" }
 egui_extras = "0.27.2"
 egui_plot = "0.27.2"
+indexmap = { version = "2.2.6", features = ["serde"] }
 itertools = "0.13.0"
 ms_parser = { git = "https://github.com/ippras/ms_parser" }
 polars = { version = "0.41.2", features = [
     "dtype-array",
-    "dtype-i16",
     "dtype-struct",
+    "dtype-i16",
+    "dtype-u16",
     "lazy",
     "pivot",
     "polars-ops",
     "regex",
+    "round_series",
     "row_hash",
     "serde",
 ] }

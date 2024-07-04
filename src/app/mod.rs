@@ -36,9 +36,10 @@ impl App {
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
+        // TODO
+        // if let Some(storage) = cc.storage {
+        //     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        // }
 
         Default::default()
     }
@@ -217,31 +218,6 @@ impl eframe::App for App {
 
 fn bin(dropped_file: &DroppedFile) -> Result<DataFrame> {
     Ok(bincode::deserialize(&dropped_file.bytes()?)?)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use polars::prelude::*;
-
-    #[test]
-    fn test() -> Result<()> {
-        let df = df! {
-            "List" => [Series::from_iter([None::<i16>, None, None])],
-            // "List" => [Series::from_iter([None::<i32>, None, None])],
-        }?;
-        println!("df: {df}");
-        let df = df
-            .lazy()
-            .with_columns([
-                col("List").list().min().name().suffix(".Min"), // if i16 - Err; if i32 - Ok: List.Min = null
-                // col("List").list().max().name().suffix(".Max"), // if i16 - Err; if i32 - Ok: List.Max = null
-                col("List").list().sum().name().suffix(".Sum"), // Ok: List.Sum = 0
-            ])
-            .collect()?;
-        println!("df: {df}");
-        Ok(())
-    }
 }
 
 mod computers;

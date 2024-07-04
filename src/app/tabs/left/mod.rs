@@ -76,11 +76,6 @@ impl SettingsTab<'_> {
             ui.checkbox(&mut context.settings.filter_null, "")
                 .on_hover_text("Filter empty/null retention time");
         });
-        ui.horizontal(|ui| {
-            ui.label("Legend:");
-            ui.checkbox(&mut context.settings.legend, "")
-                .on_hover_text("Show plot legend");
-        });
         ui.separator();
         ui.horizontal(|ui| {
             ui.label("Sort:");
@@ -104,5 +99,14 @@ impl SettingsTab<'_> {
                 .on_hover_text(context.settings.sort.description());
         });
         ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Legend:");
+            ui.checkbox(&mut context.settings.legend, "")
+                .on_hover_text("Show plot legend");
+        });
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut context.settings.visible, Some(true), "◉👁");
+            ui.selectable_value(&mut context.settings.visible, Some(false), "◎👁");
+        });
     }
 }

@@ -4,10 +4,13 @@ use crate::app::{
 };
 use egui::{emath::round_to_decimals, Align2, RichText, Ui, Vec2};
 use egui_ext::color;
-use egui_plot::{Bar, BarChart, Line, Plot, PlotPoint, PlotPoints, Text};
+use egui_plot::{Bar, BarChart, Legend, Line, Plot, PlotMemory, PlotPoint, PlotPoints, Text};
 use itertools::Itertools;
 use polars::error::PolarsResult;
-use std::{collections::HashMap, iter::zip};
+use std::{
+    collections::HashMap,
+    iter::{empty, zip},
+};
 
 /// Central plot tab
 pub(super) struct PlotTab<'a> {
@@ -48,15 +51,62 @@ impl PlotTab<'_> {
         let retention_time = data_frame["RetentionTime"].list()?;
         let signal = data_frame["Signal"].list()?;
         ui.vertical_centered_justified(|ui| {
+            // let id = ui.make_persistent_id("plot");
+            // let plot_memory = PlotMemory::load(ui.ctx(), id);
             let mut plot = Plot::new("plot")
                 .y_axis_formatter(move |y, _, _| round_to_decimals(y.value, 5).to_string());
             if context.settings.legend {
-                plot = plot.legend(Default::default());
+                let mut legend = Legend::default();
+                if let Some(visible) = context.settings.visible.take() {
+                    legend = if visible {
+                        legend.hidden_items(empty())
+                    } else {
+                        let hidden_items = mass_to_charge
+                            .iter()
+                            .filter_map(|mass_to_charge| Some(mass_to_charge?.to_string()));
+                        legend.hidden_items(hidden_items)
+                    };
+                }
+                plot = plot.legend(legend);
             }
             plot.show(ui, |ui| {
                 // let bounds = ui.plot_bounds().range_x();
                 // let width = ui.plot_bounds().width();
                 // tracing::error!(?width);
+
+                // Lines
+                for (mass_to_charge, retention_time, signal) in
+                    zip(mass_to_charge, zip(retention_time, signal)).filter_map(
+                        |(mass_to_charge, (retention_time, signal))| {
+                            Some((mass_to_charge?, retention_time?, signal?))
+                        },
+                    )
+                {
+                    let line = Line::new(PlotPoints::from_iter(
+                        zip(retention_time.i32().unwrap(), signal.u16().unwrap()).filter_map(
+                            |(retention_time, signal)| Some([retention_time? as _, signal? as _]),
+                        ),
+                    ))
+                    .name(mass_to_charge.to_string());
+                    ui.line(line);
+                }
+
+                // // Bars
+                // for (mass_to_charge, retention_time, signal) in
+                //     zip(mass_to_charge, zip(retention_time, signal)).filter_map(
+                //         |(mass_to_charge, (retention_time, signal))| {
+                //             Some((mass_to_charge?, retention_time?, signal?))
+                //         },
+                //     )
+                // {
+                //     let bars = zip(retention_time.i32().unwrap(), signal.u16().unwrap())
+                //         .filter_map(|(retention_time, signal)| {
+                //             Some(Bar::new(retention_time? as _, signal? as _))
+                //         })
+                //         .collect();
+                //     let chart = BarChart::new(bars).name(mass_to_charge.to_string());
+                //     ui.bar_chart(chart);
+                // }
 
                 // let mut charts = Vec::new();
                 // for (mass_to_charge, retention_time, signal) in
@@ -66,7 +116,7 @@ impl PlotTab<'_> {
                 //         },
                 //     )
                 // {
-                //     let bars = zip(retention_time.i32().unwrap(), signal.i16().unwrap())
+                //     let bars = zip(retention_time.i32().unwrap(), signal.().unwrap())
                 //         .filter_map(|(retention_time, signal)| {
                 //             Some(Bar::new(retention_time? as _, signal? as _))
                 //         })
