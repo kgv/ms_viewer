@@ -54,7 +54,7 @@ impl PlotTab<'_> {
             // let id = ui.make_persistent_id("plot");
             // let plot_memory = PlotMemory::load(ui.ctx(), id);
             let mut plot = Plot::new("plot")
-                .y_axis_formatter(move |y, _, _| round_to_decimals(y.value, 5).to_string());
+                .y_axis_formatter(move |y, _| round_to_decimals(y.value, 5).to_string());
             if context.settings.legend {
                 let mut legend = Legend::default();
                 if let Some(visible) = context.settings.visible.take() {
