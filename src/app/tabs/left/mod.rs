@@ -1,6 +1,6 @@
-use crate::{
-    app::context::{Context, Sort},
-    time_units::TimeUnits,
+use crate::app::context::{
+    settings::{Sort, TimeUnits},
+    Context,
 };
 use egui::{ComboBox, DragValue, Ui};
 
@@ -53,7 +53,7 @@ impl SettingsTab<'_> {
                 ));
             ui.add(
                 DragValue::new(&mut context.settings.retention_time.precision)
-                    .clamp_range(0..=MAX_PRECISION),
+                    .range(0..=MAX_PRECISION),
             )
             .on_hover_text("Precision");
         });
@@ -61,7 +61,7 @@ impl SettingsTab<'_> {
             ui.label("Mass to charge:");
             ui.add(
                 DragValue::new(&mut context.settings.mass_to_charge.precision)
-                    .clamp_range(0..=MAX_PRECISION),
+                    .range(0..=MAX_PRECISION),
             )
             .on_hover_text("Precision");
         });

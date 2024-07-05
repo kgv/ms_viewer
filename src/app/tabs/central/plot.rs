@@ -1,11 +1,11 @@
 use crate::app::{
     computers::{TableComputed, TableKey},
-    context::{Context, Sort},
+    context::{settings::Sort, Context},
 };
 use egui::{emath::round_to_decimals, Align2, RichText, Ui, Vec2};
 use egui_ext::color;
 use egui_plot::{Bar, BarChart, Legend, Line, Plot, PlotMemory, PlotPoint, PlotPoints, Text};
-use itertools::Itertools;
+// use itertools::Itertools;
 use polars::error::PolarsResult;
 use std::{
     collections::HashMap,

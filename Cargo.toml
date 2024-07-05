@@ -1,51 +1,44 @@
 [package]
-name = "ms_viewer"
-version = "0.0.4"
 edition = "2021"
+name = "ms_viewer"
+rust-version = "1.76"
+version = "0.0.5"
 
 [dependencies]
 anyhow = "1.0.86"
 bincode = "1.3.3"
-eframe = { version = "0.28.0", default-features = false, features = [
+eframe = { version = "0.28.1", default-features = false, features = [
     "accesskit",
     "default_fonts",
     "glow",
     "persistence",
 ] }
-egui = "0.28.0"
+egui = "0.28.1"
 egui_dock = { version = "0.13.0", features = ["serde"] }
 egui_ext = { git = "https://github.com/kgv/egui_ext" }
-egui_extras = "0.28.0"
-egui_plot = "0.28.0"
-indexmap = { version = "2.2.6", features = ["serde"] }
-itertools = "0.13.0"
+egui_extras = "0.28.1"
+egui_plot = "0.28.1"
+# https://github.com/pola-rs/polars/issues/17192
 polars = { version = "0.41.3", features = [
-    "dtype-array",
     "dtype-struct",
-    "dtype-i16",
     "dtype-u16",
+    "fmt_no_tty",
     "lazy",
-    "pivot",
-    "polars-ops",
-    "regex",
     "round_series",
-    "row_hash",
     "serde",
-] }
-# polars = { git = "https://github.com/pola-rs/polars", rev = "59d25294c646aef0c228c4c93870695aa1fff9c1", features = [
-#     "dtype-array",
+], default-features = false }
+# polars = { git = "https://github.com/pola-rs/polars", rev = "21602ba8610ce16e7ba675998e84e238d8066c98", features = [
 #     "dtype-struct",
+#     "dtype-u16",
+#     "fmt_no_tty",
 #     "lazy",
-#     "pivot",
-#     "polars-ops",
-#     "regex",
-#     "row_hash",
+#     "round_series",
 #     "serde",
-# ] }
+# ], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
 tracing = "0.1.40"
 uom = { version = "0.36.0", features = ["serde"] }
-# ms_parser = { git = "https://github.com/ippras/ms_parser" }
+
 
 # native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -54,6 +47,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # web
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
+getrandom = { version = "0.2.15", features = ["js"] }
 tracing-wasm = "0.2.1"
 wasm-bindgen-futures = "0.4.42"
 web-sys = "0.3.69"

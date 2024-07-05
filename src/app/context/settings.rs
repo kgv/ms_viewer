@@ -1,20 +1,5 @@
-use crate::time_units::TimeUnits;
-use indexmap::IndexMap;
-use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct Context {
-    pub(crate) state: State,
-    pub(crate) settings: Settings,
-}
-
-/// State
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct State {
-    pub(crate) data_frames: Vec<DataFrame>,
-    pub(crate) index: usize,
-}
+use uom::si::time::{millisecond, minute, second, Units};
 
 /// Settings
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -75,6 +60,39 @@ impl Default for RetentionTime {
         Self {
             precision: 2,
             units: Default::default(),
+        }
+    }
+}
+
+/// Time units
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TimeUnits {
+    Millisecond,
+    #[default]
+    Second,
+    Minute,
+}
+
+impl TimeUnits {
+    pub fn abbreviation(&self) -> &'static str {
+        Units::from(*self).abbreviation()
+    }
+
+    pub fn singular(&self) -> &'static str {
+        Units::from(*self).singular()
+    }
+
+    pub fn plural(&self) -> &'static str {
+        Units::from(*self).plural()
+    }
+}
+
+impl From<TimeUnits> for Units {
+    fn from(value: TimeUnits) -> Self {
+        match value {
+            TimeUnits::Millisecond => Units::millisecond(millisecond),
+            TimeUnits::Second => Units::second(second),
+            TimeUnits::Minute => Units::minute(minute),
         }
     }
 }

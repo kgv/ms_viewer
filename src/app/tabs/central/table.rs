@@ -1,9 +1,9 @@
-use crate::{
-    app::{
-        computers::{TableComputed, TableKey},
-        context::{Context, Sort},
+use crate::app::{
+    computers::{TableComputed, TableKey},
+    context::{
+        settings::{Sort, TimeUnits},
+        Context,
     },
-    time_units::TimeUnits,
 };
 use egui::{Direction, Layout, Ui};
 use egui_ext::TableRowExt;
