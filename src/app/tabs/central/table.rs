@@ -1,15 +1,18 @@
-use crate::app::{
-    computers::{TableComputed, TableKey},
-    context::{
-        settings::{Sort, TimeUnits},
-        Context,
+use crate::{
+    app::{
+        computers::{TableComputed, TableKey},
+        context::{
+            settings::{Sort, TimeUnits},
+            Context,
+        },
     },
+    utils::ChunkedArrayExt,
 };
-use egui::{Direction, Layout, Ui};
+use egui::{Direction, Layout, ScrollArea, Ui};
 use egui_ext::TableRowExt;
 use egui_extras::{Column, TableBuilder};
 use polars::error::PolarsResult;
-use tracing::{error, info, trace};
+use tracing::error;
 use uom::si::{
     f32::Time,
     time::{millisecond, minute, second},
@@ -51,7 +54,7 @@ impl TableTab<'_> {
             memory
                 .caches
                 .cache::<TableComputed>()
-                .get(TableKey { context: &context })
+                .get(TableKey { context })
         });
         let total_rows = data_frame.height();
         let mass_to_charge = data_frame["MassToCharge"].f32()?;
@@ -82,14 +85,31 @@ impl TableTab<'_> {
                                 "{value:.*}",
                                 context.settings.mass_to_charge.precision,
                             ))
-                            .on_hover_text(format!("{value}"));
+                            .on_hover_text(value.to_string());
                         } else {
-                            ui.label("None");
+                            ui.label("null");
                         }
                     });
                     row.left_align_col(|ui| {
                         if let Some(value) = retention_time.get_as_series(row_index) {
-                            ui.label(format!("{}", value.fmt_list())).on_hover_ui(|ui| {
+                            let chunked_array = value.i32().unwrap();
+                            ui.label(
+                                chunked_array
+                                    .display(|value| {
+                                        let time = Time::new::<millisecond>(value as _);
+                                        let value = match context.settings.retention_time.units {
+                                            TimeUnits::Millisecond => time.get::<millisecond>(),
+                                            TimeUnits::Second => time.get::<second>(),
+                                            TimeUnits::Minute => time.get::<minute>(),
+                                        };
+                                        format!(
+                                            "{value:.*}",
+                                            context.settings.retention_time.precision,
+                                        )
+                                    })
+                                    .to_string(),
+                            )
+                            .on_hover_ui(|ui| {
                                 if let Ok(value) = &data_frame["RetentionTime.Count"].get(row_index)
                                 {
                                     ui.horizontal(|ui| {
@@ -109,45 +129,59 @@ impl TableTab<'_> {
                                         ui.label(format!("{value}"));
                                     });
                                 }
+                            })
+                            .context_menu(|ui| {
+                                if ui.button("🗐 Copy").clicked() {
+                                    ui.output_mut(|output| {
+                                        output.copied_text = chunked_array.iter().join(", ")
+                                    });
+                                };
+                                ui.separator();
+                                ScrollArea::vertical().show(ui, |ui| {
+                                    for value in chunked_array {
+                                        if let Some(value) = value {
+                                            let time = Time::new::<millisecond>(value as _);
+                                            let value = match context.settings.retention_time.units
+                                            {
+                                                TimeUnits::Millisecond => time.get::<millisecond>(),
+                                                TimeUnits::Second => time.get::<second>(),
+                                                TimeUnits::Minute => time.get::<minute>(),
+                                            };
+                                            ui.label(format!(
+                                                "{value:.*}",
+                                                context.settings.retention_time.precision,
+                                            ));
+                                        }
+                                    }
+                                });
                             });
-                            // let time = Time::new::<millisecond>(value as _);
-                            // let value = match context.settings.retention_time.units {
-                            //     TimeUnits::Millisecond => time.get::<millisecond>(),
-                            //     TimeUnits::Second => time.get::<second>(),
-                            //     TimeUnits::Minute => time.get::<minute>(),
-                            // };
-                            // ui.label(format!(
-                            //     "{value:.*}",
-                            //     context.settings.retention_time.precision,
-                            // ))
-                            // .on_hover_text(format!("{value}"));
                         }
                     });
                     row.left_align_col(|ui| {
                         if let Some(value) = signal.get_as_series(row_index) {
-                            ui.label(format!("{}", value.fmt_list())).on_hover_ui(|ui| {
+                            ui.label(value.fmt_list()).on_hover_ui(|ui| {
                                 if let Ok(value) = &data_frame["Signal.Count"].get(row_index) {
                                     ui.horizontal(|ui| {
                                         ui.label("Count:");
-                                        ui.label(format!("{value}"));
+                                        ui.label(value.to_string());
                                     });
                                 }
                                 if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
                                     ui.horizontal(|ui| {
                                         ui.label("Min:");
-                                        ui.label(format!("{value}"));
+                                        ui.label(value.to_string());
                                     });
                                 }
                                 if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
                                     ui.horizontal(|ui| {
                                         ui.label("Max:");
-                                        ui.label(format!("{value}"));
+                                        ui.label(value.to_string());
                                     });
                                 }
                                 if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
                                     ui.horizontal(|ui| {
                                         ui.label("Sum:");
-                                        ui.label(format!("{value}"));
+                                        ui.label(value.to_string());
                                     });
                                 }
                             });
@@ -165,7 +199,7 @@ impl TableTab<'_> {
             memory
                 .caches
                 .cache::<TableComputed>()
-                .get(TableKey { context: &context })
+                .get(TableKey { context })
         });
         let total_rows = data_frame.height();
         let retention_time = data_frame["RetentionTime"].i32()?;
@@ -193,6 +227,7 @@ impl TableTab<'_> {
             .body(|body| {
                 body.rows(height, total_rows, |mut row| {
                     let row_index = row.index();
+                    // Retention time
                     row.left_align_col(|ui| {
                         if let Some(value) = retention_time.get(row_index) {
                             let time = Time::new::<millisecond>(value as _);
@@ -205,12 +240,25 @@ impl TableTab<'_> {
                                 "{value:.*}",
                                 context.settings.retention_time.precision,
                             ))
-                            .on_hover_text(format!("{value}"));
+                            .on_hover_text(value.to_string());
                         }
                     });
+                    // Mass to charge
                     row.left_align_col(|ui| {
                         if let Some(value) = mass_to_charge.get_as_series(row_index) {
-                            ui.label(format!("{}", value.fmt_list())).on_hover_ui(|ui| {
+                            ui.label(
+                                value
+                                    .f32()
+                                    .unwrap()
+                                    .display(|value| {
+                                        format!(
+                                            "{value:.*}",
+                                            context.settings.mass_to_charge.precision,
+                                        )
+                                    })
+                                    .to_string(),
+                            )
+                            .on_hover_ui(|ui| {
                                 if let Ok(value) = &data_frame["MassToCharge.Count"].get(row_index)
                                 {
                                     ui.horizontal(|ui| {
@@ -233,9 +281,10 @@ impl TableTab<'_> {
                             });
                         }
                     });
+                    // Signal
                     row.left_align_col(|ui| {
                         if let Some(value) = signal.get_as_series(row_index) {
-                            ui.label(format!("{}", value.fmt_list())).on_hover_ui(|ui| {
+                            ui.label(value.fmt_list()).on_hover_ui(|ui| {
                                 if let Ok(value) = &data_frame["Signal.Count"].get(row_index) {
                                     ui.horizontal(|ui| {
                                         ui.label("Count:");
@@ -275,7 +324,7 @@ impl TableTab<'_> {
             memory
                 .caches
                 .cache::<TableComputed>()
-                .get(TableKey { context: &context })
+                .get(TableKey { context })
         });
         let total_rows = data_frame.height();
         let retention_time = data_frame["RetentionTime"].i32()?;

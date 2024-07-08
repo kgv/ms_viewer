@@ -6,11 +6,12 @@ use uom::si::time::{millisecond, minute, second, Units};
 pub(crate) struct Settings {
     pub(crate) explode: bool,
     pub(crate) filter_null: bool,
-    pub(crate) legend: bool,
-    pub(crate) visible: Option<bool>,
-    pub(crate) sort: Sort,
     pub(crate) mass_to_charge: MassToCharge,
     pub(crate) retention_time: RetentionTime,
+    pub(crate) sort: Sort,
+
+    pub(crate) legend: bool,
+    pub(crate) visible: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]

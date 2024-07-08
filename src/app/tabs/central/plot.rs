@@ -7,10 +7,8 @@ use egui_ext::color;
 use egui_plot::{Bar, BarChart, Legend, Line, Plot, PlotMemory, PlotPoint, PlotPoints, Text};
 // use itertools::Itertools;
 use polars::error::PolarsResult;
-use std::{
-    collections::HashMap,
-    iter::{empty, zip},
-};
+use std::iter::{empty, zip};
+use tracing::error;
 
 /// Central plot tab
 pub(super) struct PlotTab<'a> {
@@ -25,16 +23,17 @@ impl<'a> PlotTab<'a> {
 
 impl PlotTab<'_> {
     pub(super) fn view(self, ui: &mut Ui) {
-        match self.context.settings.sort {
+        if let Err(error) = match self.context.settings.sort {
             Sort::RetentionTime if !self.context.settings.explode => {
-                // self.grouped_by_retention_time(ui)
+                self.grouped_by_retention_time(ui)
             }
             Sort::MassToCharge if !self.context.settings.explode => {
-                self.grouped_by_mass_to_charge(ui).unwrap()
+                self.grouped_by_mass_to_charge(ui)
             }
-            _ => {
-                // self.exploded(ui);
-            }
+            _ => unimplemented!(),
+        } {
+            error!(%error);
+            ui.label(error.to_string());
         }
     }
 
@@ -213,6 +212,63 @@ impl PlotTab<'_> {
                 //     }
                 // }
             });
+        });
+        Ok(())
+    }
+
+    pub(super) fn grouped_by_retention_time(self, ui: &mut Ui) -> PolarsResult<()> {
+        let Self { context } = self;
+        let data_frame = ui.memory_mut(|memory| {
+            memory
+                .caches
+                .cache::<TableComputed>()
+                .get(TableKey { context })
+        });
+        let retention_time = data_frame["RetentionTime"].i32()?;
+        let mass_to_charge = data_frame["MassToCharge"].list()?;
+        let signal = data_frame["Signal.Sum"].i64()?;
+        let mut plot = Plot::new("plot")
+            .y_axis_formatter(move |y, _| round_to_decimals(y.value, 5).to_string());
+        if context.settings.legend {
+            let mut legend = Legend::default();
+            if let Some(visible) = context.settings.visible.take() {
+                legend = if visible {
+                    legend.hidden_items(empty())
+                } else {
+                    let hidden_items = retention_time
+                        .iter()
+                        .filter_map(|retention_time| Some(retention_time?.to_string()));
+                    legend.hidden_items(hidden_items)
+                };
+            }
+            plot = plot.legend(legend);
+        }
+        plot.show(ui, |ui| {
+            let range_x = ui.plot_bounds().range_x();
+            // let width = ui.plot_bounds().width();
+            // tracing::error!(?width);
+
+            // Bars
+            let mut bars = Vec::new();
+            for (retention_time, _mass_to_charge, signal) in
+                zip(retention_time, zip(mass_to_charge, signal)).filter_map(
+                    |(retention_time, (mass_to_charge, signal))| {
+                        Some((retention_time?, mass_to_charge?, signal?))
+                    },
+                )
+            {
+                // error!(retention_time, ?range_x);
+                let retention_time = retention_time as _;
+                if range_x.start().floor() <= retention_time
+                    && retention_time <= range_x.end().ceil()
+                {
+                    // error!(retention_time, ?range_x);
+                    let bar = Bar::new(retention_time, signal as _);
+                    bars.push(bar);
+                }
+            }
+            let chart = BarChart::new(bars);
+            ui.bar_chart(chart);
         });
         Ok(())
     }

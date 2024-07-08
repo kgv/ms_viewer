@@ -64,7 +64,7 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
                         col("Signal").list().len().name().suffix(".Count"),
                         col("Signal").list().min().name().suffix(".Min"),
                         col("Signal").list().max().name().suffix(".Max"),
-                        // col("Signal").list().sum().name().suffix(".Sum"),
+                        col("Signal").list().sum().name().suffix(".Sum"),
                     ])
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
