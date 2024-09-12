@@ -1,8 +1,11 @@
+use egui::{ComboBox, DragValue, Ui};
 use serde::{Deserialize, Serialize};
 use uom::si::time::{millisecond, minute, second, Units};
 
+use crate::app::MAX_PRECISION;
+
 /// Settings
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub(crate) struct Settings {
     pub(crate) explode: bool,
     pub(crate) filter_null: bool,
@@ -12,6 +15,91 @@ pub(crate) struct Settings {
 
     pub(crate) legend: bool,
     pub(crate) visible: Option<bool>,
+}
+
+impl Settings {
+    pub(crate) fn ui(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Retention time");
+            ComboBox::from_id_source("retention_time_units")
+                .selected_text(self.retention_time.units.singular())
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut self.retention_time.units,
+                        TimeUnits::Millisecond,
+                        TimeUnits::Millisecond.singular(),
+                    )
+                    .on_hover_text(TimeUnits::Millisecond.abbreviation());
+                    ui.selectable_value(
+                        &mut self.retention_time.units,
+                        TimeUnits::Second,
+                        TimeUnits::Second.singular(),
+                    )
+                    .on_hover_text(TimeUnits::Second.abbreviation());
+                    ui.selectable_value(
+                        &mut self.retention_time.units,
+                        TimeUnits::Minute,
+                        TimeUnits::Minute.singular(),
+                    )
+                    .on_hover_text(TimeUnits::Minute.abbreviation());
+                })
+                .response
+                .on_hover_text(format!(
+                    "Units {}",
+                    self.retention_time.units.abbreviation(),
+                ));
+            ui.add(DragValue::new(&mut self.retention_time.precision).range(0..=MAX_PRECISION))
+                .on_hover_text("Precision");
+        });
+        ui.horizontal(|ui| {
+            ui.label("Mass to charge");
+            ui.add(DragValue::new(&mut self.mass_to_charge.precision).range(0..=MAX_PRECISION))
+                .on_hover_text("Precision");
+        });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Explode");
+            ui.checkbox(&mut self.explode, "")
+                .on_hover_text("Explode lists");
+        });
+        ui.horizontal(|ui| {
+            ui.label("Filter empty/null");
+            ui.checkbox(&mut self.filter_null, "")
+                .on_hover_text("Filter empty/null retention time");
+        });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Sort");
+            ComboBox::from_id_source("sort")
+                .selected_text(self.sort.display())
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut self.sort,
+                        Sort::RetentionTime,
+                        Sort::RetentionTime.display(),
+                    )
+                    .on_hover_text(Sort::RetentionTime.description());
+                    ui.selectable_value(
+                        &mut self.sort,
+                        Sort::MassToCharge,
+                        Sort::MassToCharge.display(),
+                    )
+                    .on_hover_text(Sort::MassToCharge.description());
+                })
+                .response
+                .on_hover_text(self.sort.description());
+        });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Legend");
+            ui.checkbox(&mut self.legend, "")
+                .on_hover_text("Show plot legend");
+        });
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.visible, Some(true), "◉👁");
+            ui.selectable_value(&mut self.visible, Some(false), "◎👁");
+        });
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -38,7 +126,7 @@ impl Sort {
 }
 
 /// Mass to charge settings
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub(crate) struct MassToCharge {
     pub(crate) precision: usize,
 }
@@ -50,7 +138,7 @@ impl Default for MassToCharge {
 }
 
 /// Retention time settings
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub(crate) struct RetentionTime {
     pub(crate) precision: usize,
     pub(crate) units: TimeUnits,

@@ -19,17 +19,17 @@ impl Behavior {
         for tile_id in tree.active_tiles() {
             if let Some(Tile::Pane(pane)) = tree.tiles.get_mut(tile_id) {
                 ui.visuals_mut().collapsing_header_frame = true;
-                let open = self
-                    .toggle
-                    .take_if(|toggle| *toggle == tile_id)
-                    .map(|tile_id| {
-                        let id = ui.make_persistent_id(tile_id);
-                        ui.data_mut(|data| {
-                            let open = data.get_persisted_mut_or_default::<bool>(id);
-                            *open = !*open;
-                            *open
-                        })
-                    });
+                // let open = self
+                //     .toggle
+                //     .take_if(|toggle| *toggle == tile_id)
+                //     .map(|tile_id| {
+                //         let id = ui.make_persistent_id(tile_id);
+                //         ui.data_mut(|data| {
+                //             let open = data.get_persisted_mut_or_default::<bool>(id);
+                //             *open = !*open;
+                //             *open
+                //         })
+                //     });
                 ui.collapsing(RichText::new(pane.title()).heading(), |ui| {
                     pane.settings(ui);
                 });
