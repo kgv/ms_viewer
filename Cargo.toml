@@ -27,6 +27,7 @@ polars = { version = "0.43.0", features = [
     "dtype-u16",
     "fmt_no_tty",
     "lazy",
+    "list_eval",
     "round_series",
     "serde",
 ], default-features = false }

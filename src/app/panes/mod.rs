@@ -32,6 +32,13 @@ impl Pane {
             Self::Table(_) => "Table",
         }
     }
+
+    pub(crate) const fn data_frame(&self) -> &DataFrame {
+        match self {
+            Self::Plot(plot) => &plot.data_frame,
+            Self::Table(table) => &table.data_frame,
+        }
+    }
 }
 
 impl Pane {
@@ -54,3 +61,5 @@ pub(crate) mod behavior;
 pub(crate) mod plot;
 pub(crate) mod settings;
 pub(crate) mod table;
+
+pub(crate) mod masspectrum;

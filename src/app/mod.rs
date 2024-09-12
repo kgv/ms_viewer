@@ -250,6 +250,18 @@ impl App {
                 ui.separator();
                 // Save
                 if ui.button(icon!(FLOPPY_DISK)).clicked() {
+                    // for tile_id in self.tree.active_tiles() {
+                    //     if let Some(root) = self.tree.root() {
+                    //         self.tree.
+                    //         match tile {
+                    //             Tile::Pane(pane) => {
+                    //                 pane.title();
+                    //                 pane.data_frame();
+                    //             }
+                    //             Tile::Container(container) => todo!(),
+                    //         }
+                    //     }
+                    // }
                     // if let Err(error) = self.data.save("df.utca.ron") {
                     //     error!(%error);
                     // }

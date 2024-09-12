@@ -1,4 +1,7 @@
-use super::settings::{Settings, Sort, TimeUnits};
+use super::{
+    masspectrum::Masspectrum,
+    settings::{Settings, Sort, TimeUnits},
+};
 use crate::{
     app::computers::{TableComputed, TableKey},
     utils::ChunkedArrayExt,
@@ -190,6 +193,7 @@ impl TablePane {
 
     fn grouped_by_retention_time(&self, ui: &mut Ui) -> PolarsResult<()> {
         let height = ui.spacing().interact_size.y;
+        let width = ui.spacing().interact_size.x;
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
                 data_frame: &self.data_frame,
@@ -199,11 +203,11 @@ impl TablePane {
         let total_rows = data_frame.height();
         let indices = data_frame["Index"].u32()?;
         let retention_time = data_frame["RetentionTime"].i32()?;
-        let mass_to_charge = data_frame["MassToCharge"].list()?;
-        let signal = data_frame["Signal"].list()?;
+        let masspectrum = data_frame["Masspectrum"].list()?;
         TableBuilder::new(ui)
             .cell_layout(Layout::centered_and_justified(Direction::LeftToRight))
-            .columns(Column::auto(), COLUMN_COUNT)
+            .column(Column::auto_with_initial_suggestion(width))
+            .columns(Column::auto(), COLUMN_COUNT - 2)
             .auto_shrink(false)
             .striped(true)
             .header(height, |mut row| {
@@ -217,10 +221,7 @@ impl TablePane {
                     ));
                 });
                 row.col(|ui| {
-                    ui.heading("Mass to charge");
-                });
-                row.col(|ui| {
-                    ui.heading("Signal");
+                    ui.heading("Masspectrum");
                 });
             })
             .body(|body| {
@@ -247,75 +248,103 @@ impl TablePane {
                             .on_hover_text(value.to_string());
                         }
                     });
-                    // Mass to charge
+                    // Masspectrum
                     row.left_align_col(|ui| {
-                        if let Some(value) = mass_to_charge.get_as_series(row_index) {
-                            ui.label(
-                                value
-                                    .f32()
-                                    .unwrap()
-                                    .display(|value| {
-                                        format!(
-                                            "{value:.*}",
-                                            self.settings.mass_to_charge.precision,
-                                        )
-                                    })
-                                    .to_string(),
-                            )
-                            .on_hover_ui(|ui| {
-                                if let Ok(value) = &data_frame["MassToCharge.Count"].get(row_index)
-                                {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Count:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["MassToCharge.Min"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Min:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["MassToCharge.Max"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Max:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                            });
-                        }
+                        ui.add(Masspectrum {
+                            data_frame: &data_frame,
+                            row_index,
+                        });
+                        // let mass_to_charge_signal_series =
+                        //     masspectrum.get_as_series(row_index).unwrap();
+                        // ui.menu_button(mass_to_charge_signal_series.fmt_list(), |ui| {
+                        //     let total_rows = mass_to_charge_signal_series.len();
+                        //     let mass_to_charge_signal =
+                        //         mass_to_charge_signal_series.struct_().unwrap();
+                        //     let mass_to_charge_series =
+                        //         mass_to_charge_signal.field_by_name("MassToCharge").unwrap();
+                        //     let signal_series =
+                        //         mass_to_charge_signal.field_by_name("Signal").unwrap();
+                        //     let mass_to_charge = mass_to_charge_series.f32().unwrap();
+                        //     let signal = signal_series.u16().unwrap();
+                        //     ScrollArea::vertical().show_rows(
+                        //         ui,
+                        //         height,
+                        //         total_rows,
+                        //         |ui, row_range| {
+                        //             for row_index in row_range {
+                        //                 let text = format!(
+                        //                     "{}: {} {}",
+                        //                     row_index + 1,
+                        //                     mass_to_charge.get(row_index).unwrap(),
+                        //                     signal.get(row_index).unwrap(),
+                        //                 );
+                        //                 ui.label(text);
+                        //             }
+                        //         },
+                        //     );
+                        // })
+                        // .response
+                        // .on_hover_ui(|ui| {
+                        //     if let Ok(value) = &data_frame["Masspectrum.Count"].get(row_index) {
+                        //         ui.label(format!("Count: {value}"));
+                        //     }
+                        // })
+                        // .on_hover_ui(|ui| {
+                        //     ui.heading("Mass to charge");
+                        //     if let Ok(value) = &data_frame["MassToCharge.Min"].get(row_index) {
+                        //         ui.label(format!("Min: {value}"));
+                        //     }
+                        //     if let Ok(value) = &data_frame["MassToCharge.Max"].get(row_index) {
+                        //         ui.label(format!("Max: {value}"));
+                        //     }
+                        // })
+                        // .on_hover_ui(|ui| {
+                        //     ui.heading("Signal");
+                        //     if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
+                        //         ui.label(format!("Min: {value}"));
+                        //     }
+                        //     if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
+                        //         ui.label(format!("Max: {value}"));
+                        //     }
+                        //     if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
+                        //         ui.label(format!("Sum: {value}"));
+                        //     }
+                        // });
                     });
-                    // Signal
-                    row.left_align_col(|ui| {
-                        if let Some(value) = signal.get_as_series(row_index) {
-                            ui.label(value.fmt_list()).on_hover_ui(|ui| {
-                                if let Ok(value) = &data_frame["Signal.Count"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Count:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Min:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Max:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Sum:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                            });
-                        }
-                    });
+                    // // Mass to charge
+                    // row.left_align_col(|ui| {
+                    //     let mass_to_charge =
+                    //         mass_to_charge_signal.field_by_name("MassToCharge").unwrap();
+                    //     ui.label(mass_to_charge.fmt_list()).on_hover_ui(|ui| {
+                    //         if let Ok(value) = &data_frame["Masspectrum.Count"].get(row_index) {
+                    //             ui.label(format!("Count: {value}"));
+                    //         }
+                    //         if let Ok(value) = &data_frame["MassToCharge.Min"].get(row_index) {
+                    //             ui.label(format!("Min: {value}"));
+                    //         }
+                    //         if let Ok(value) = &data_frame["MassToCharge.Max"].get(row_index) {
+                    //             ui.label(format!("Max: {value}"));
+                    //         }
+                    //     });
+                    // });
+                    // // Signal
+                    // row.left_align_col(|ui| {
+                    //     let signal = mass_to_charge_signal.field_by_name("Signal").unwrap();
+                    //     ui.label(signal.fmt_list()).on_hover_ui(|ui| {
+                    //         if let Ok(value) = &data_frame["Masspectrum.Count"].get(row_index) {
+                    //             ui.label(format!("Count: {value}"));
+                    //         }
+                    //         if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
+                    //             ui.label(format!("Min: {value}"));
+                    //         }
+                    //         if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
+                    //             ui.label(format!("Max: {value}"));
+                    //         }
+                    //         if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
+                    //             ui.label(format!("Sum: {value}"));
+                    //         }
+                    //     });
+                    // });
                 });
             });
         Ok(())

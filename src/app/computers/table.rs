@@ -11,55 +11,87 @@ pub(crate) type Computed = FrameCache<DataFrame, Computer>;
 #[derive(Default)]
 pub(crate) struct Computer;
 
+// fn signal() -> Expr {
+//     col("").struct_().field_by_name("Signal")
+// }
+
 impl ComputerMut<Key<'_>, DataFrame> for Computer {
     fn compute(&mut self, key: Key<'_>) -> DataFrame {
         let mut data_frame = key.data_frame.clone();
         error!(?data_frame);
         {
-            let data_frame = data_frame
-                .clone()
-                .lazy()
-                .explode(["MassToCharge", "Signal"])
-                // .select([
-                //     col("RetentionTime"),
-                //     as_struct(vec![col("MassToCharge"), col("Signal")]),
-                // ])
-                .group_by([col("RetentionTime")])
-                .agg([as_struct(vec![col("MassToCharge"), col("Signal")]).alias("Masspectrum")])
-                .collect()
-                .unwrap();
-            let contents = bincode::serialize(&data_frame).unwrap();
-            std::fs::write("df.msv.bin", &contents).unwrap();
-            let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
-            std::fs::write("df.msv.ron", &contents).unwrap();
-            error!(?data_frame);
+            // let data_frame = data_frame
+            //     .clone()
+            //     .lazy()
+            //     .explode(["Masspectrum"])
+            //     .unnest(["Masspectrum"])
+            //     .sort(["MassToCharge"], Default::default())
+            //     .group_by([col("RetentionTime")])
+            //     .agg([as_struct(vec![
+            //         col("MassToCharge").drop_nulls(),
+            //         col("Signal").drop_nulls(),
+            //     ])
+            //     .alias("Masspectrum")])
+            //     .collect()
+            //     .unwrap();
+            // // let contents = bincode::serialize(&data_frame).unwrap();
+            // // std::fs::write("df.msv.bin", &contents).unwrap();
+            // // let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
+            // // std::fs::write("df.msv.ron", &contents).unwrap();
+            // error!(?data_frame);
         }
         let mut lazy_frame = data_frame.lazy();
         if key.settings.filter_null {
-            lazy_frame = lazy_frame.filter(col("MassToCharge").list().len().neq(lit(0)));
+            lazy_frame = lazy_frame.filter(col("Masspectrum").list().len().neq(lit(0)));
         }
-        match key.settings.sort {
+        match Sort::RetentionTime {
             Sort::RetentionTime if key.settings.explode => {
                 lazy_frame = lazy_frame
-                    .explode(["MassToCharge", "Signal"])
+                    .explode(["Masspectrum"])
+                    .unnest(["Masspectrum"])
                     .sort_by_exprs([col("RetentionTime")], Default::default());
             }
             Sort::RetentionTime => {
                 lazy_frame = lazy_frame
                     .with_columns([
-                        col("MassToCharge").list().len().name().suffix(".Count"),
-                        col("MassToCharge").list().min().name().suffix(".Min"),
-                        col("MassToCharge").list().max().name().suffix(".Max"),
-                        col("Signal").list().len().name().suffix(".Count"),
-                        col("Signal").list().min().name().suffix(".Min"),
-                        col("Signal").list().max().name().suffix(".Max"),
-                        col("Signal").list().sum().name().suffix(".Sum"),
+                        col("Masspectrum").list().len().name().suffix(".Count"),
+                        col("Masspectrum")
+                            .list()
+                            .eval(col("").struct_().field_by_name("MassToCharge"), true)
+                            .list()
+                            .min()
+                            .alias("MassToCharge.Min"),
+                        col("Masspectrum")
+                            .list()
+                            .eval(col("").struct_().field_by_name("MassToCharge"), true)
+                            .list()
+                            .max()
+                            .alias("MassToCharge.Max"),
+                        col("Masspectrum")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .min()
+                            .alias("Signal.Min"),
+                        col("Masspectrum")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .max()
+                            .alias("Signal.Max"),
+                        col("Masspectrum")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .sum()
+                            .alias("Signal.Sum"),
                     ])
                     .sort_by_exprs([col("RetentionTime")], Default::default());
             }
             Sort::MassToCharge if key.settings.explode => {
                 lazy_frame = lazy_frame
-                    .explode(["MassToCharge", "Signal"])
+                    .explode(["Masspectrum"])
+                    .unnest(["Masspectrum"])
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
             Sort::MassToCharge => {

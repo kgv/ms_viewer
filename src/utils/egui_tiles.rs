@@ -1,8 +1,13 @@
+use std::iter::once;
+
 use egui_tiles::{Container, Tile, TileId, Tiles, Tree};
+use itertools::Either;
 
 /// [`Container`] extension methods
 pub trait ContainerExt {
     fn find_child_pane<'a, T>(&'a self, tiles: &'a Tiles<T>) -> Option<&'a T>;
+
+    // fn active_panes<'a, T>(&'a self, tiles: &'a Tiles<T>, f: impl Fn(&T));
 }
 
 impl ContainerExt for Container {
@@ -12,6 +17,15 @@ impl ContainerExt for Container {
             Tile::Pane(pane) => Some(pane),
         })
     }
+
+    // fn active_panes<'a, T>(&'a self, tiles: &'a Tiles<T>, f: impl Fn(&T)) {
+    //     for child in self.active_children() {
+    //         match tiles.get(*child).unwrap() {
+    //             Tile::Container(container) => container.active_panes(tiles, &f),
+    //             Tile::Pane(pane) => f(pane),
+    //         }
+    //     }
+    // }
 }
 
 /// Extension methods for [`Tiles`]
