@@ -1,31 +1,38 @@
 use self::{
     context::Context,
-    tabs::central::{Tab as CentralTab, Tabs as CentralTabs},
+    panes::{behavior::Behavior, Pane},
 };
 use anyhow::Result;
+use eframe::{get_value, APP_KEY};
 use egui::{
     global_dark_light_mode_switch, menu::bar, warn_if_debug_build, Align, Align2, Button,
-    CentralPanel, Color32, DroppedFile, Id, LayerId, Layout, Order, RichText, SidePanel, TextStyle,
-    TopBottomPanel,
+    CentralPanel, Color32, DroppedFile, FontDefinitions, Id, LayerId, Layout, Order, RichText,
+    SidePanel, TextStyle, TopBottomPanel,
 };
-use egui_dock::{DockArea, Style};
 use egui_ext::{DroppedFileExt, HoveredFileExt, WithVisuals};
+use egui_phosphor::{add_to_fonts, Variant};
+use egui_tiles::Tree;
 use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Write, str, time::Duration};
-use tabs::{central::Dock, left::SettingsTab};
 use tracing::{error, info, trace};
 
+/// IEEE 754-2008
+const MAX_PRECISION: usize = 16;
 const _NOTIFICATIONS_DURATION: Duration = Duration::from_secs(15);
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct App {
+    reactive: bool,
+    // Panels
+    left_panel: bool,
+    // Panes
+    tree: Tree<Pane>,
+    behavior: Behavior,
+
     // Context
     context: Context,
-    // Docks
-    dock: Dock,
 }
 
 impl App {
@@ -33,14 +40,15 @@ impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+        let mut fonts = FontDefinitions::default();
+        add_to_fonts(&mut fonts, Variant::Regular);
+        cc.egui_ctx.set_fonts(fonts);
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
+        cc.storage
+            .and_then(|storage| get_value(storage, APP_KEY))
+            .unwrap_or_default()
     }
 
     fn drag_and_drop(&mut self, ctx: &egui::Context) {
@@ -221,4 +229,4 @@ fn bin(dropped_file: &DroppedFile) -> Result<DataFrame> {
 
 mod computers;
 mod context;
-mod tabs;
+mod panes;
