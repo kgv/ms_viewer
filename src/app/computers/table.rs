@@ -1,8 +1,8 @@
-use crate::app::context::{settings::Sort, Context};
+use crate::app::panes::settings::{Settings, Sort};
 use egui::util::cache::{ComputerMut, FrameCache};
 use polars::{frame::DataFrame, prelude::*};
 use std::hash::{Hash, Hasher};
-use tracing::trace;
+use tracing::{error, trace, warn};
 
 /// Filter computed
 pub(crate) type Computed = FrameCache<DataFrame, Computer>;
@@ -13,21 +13,39 @@ pub(crate) struct Computer;
 
 impl ComputerMut<Key<'_>, DataFrame> for Computer {
     fn compute(&mut self, key: Key<'_>) -> DataFrame {
-        let Key { context } = key;
-        let mut data_frame = context.state.data_frames[context.state.index].clone();
-        trace!(?data_frame);
-        let mut lazy_data_frame = data_frame.lazy();
-        if context.settings.filter_null {
-            lazy_data_frame = lazy_data_frame.filter(col("MassToCharge").list().len().neq(lit(0)));
+        let mut data_frame = key.data_frame.clone();
+        error!(?data_frame);
+        {
+            let data_frame = data_frame
+                .clone()
+                .lazy()
+                .explode(["MassToCharge", "Signal"])
+                // .select([
+                //     col("RetentionTime"),
+                //     as_struct(vec![col("MassToCharge"), col("Signal")]),
+                // ])
+                .group_by([col("RetentionTime")])
+                .agg([as_struct(vec![col("MassToCharge"), col("Signal")]).alias("Masspectrum")])
+                .collect()
+                .unwrap();
+            let contents = bincode::serialize(&data_frame).unwrap();
+            std::fs::write("df.msv.bin", &contents).unwrap();
+            let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
+            std::fs::write("df.msv.ron", &contents).unwrap();
+            error!(?data_frame);
         }
-        match context.settings.sort {
-            Sort::RetentionTime if context.settings.explode => {
-                lazy_data_frame = lazy_data_frame
+        let mut lazy_frame = data_frame.lazy();
+        if key.settings.filter_null {
+            lazy_frame = lazy_frame.filter(col("MassToCharge").list().len().neq(lit(0)));
+        }
+        match key.settings.sort {
+            Sort::RetentionTime if key.settings.explode => {
+                lazy_frame = lazy_frame
                     .explode(["MassToCharge", "Signal"])
                     .sort_by_exprs([col("RetentionTime")], Default::default());
             }
             Sort::RetentionTime => {
-                lazy_data_frame = lazy_data_frame
+                lazy_frame = lazy_frame
                     .with_columns([
                         col("MassToCharge").list().len().name().suffix(".Count"),
                         col("MassToCharge").list().min().name().suffix(".Min"),
@@ -39,14 +57,14 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
                     ])
                     .sort_by_exprs([col("RetentionTime")], Default::default());
             }
-            Sort::MassToCharge if context.settings.explode => {
-                lazy_data_frame = lazy_data_frame
+            Sort::MassToCharge if key.settings.explode => {
+                lazy_frame = lazy_frame
                     .explode(["MassToCharge", "Signal"])
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
             Sort::MassToCharge => {
-                trace!(lazy_data_frame =? lazy_data_frame.clone().collect());
-                lazy_data_frame = lazy_data_frame
+                trace!(lazy_data_frame =? lazy_frame.clone().collect());
+                lazy_frame = lazy_frame
                     .explode(["MassToCharge", "Signal"])
                     .group_by([col("RetentionTime"), col("MassToCharge").round(0)])
                     .agg([col("Signal")])
@@ -69,7 +87,7 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
         };
-        data_frame = lazy_data_frame.collect().unwrap();
+        data_frame = lazy_frame.with_row_index("Index", None).collect().unwrap();
         // .unwrap_or(context.state.data_frames[context.state.index].clone());
         trace!(?data_frame);
         data_frame
@@ -79,14 +97,13 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
 /// Filter key
 #[derive(Clone, Copy, Debug)]
 pub struct Key<'a> {
-    pub(crate) context: &'a Context,
+    pub(crate) data_frame: &'a DataFrame,
+    pub(crate) settings: &'a Settings,
 }
 
 impl Hash for Key<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.context.state.index.hash(state);
-        self.context.settings.explode.hash(state);
-        self.context.settings.filter_null.hash(state);
-        self.context.settings.sort.hash(state);
+        // self.context.state.index.hash(state);
+        self.settings.hash(state);
     }
 }

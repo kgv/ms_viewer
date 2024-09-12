@@ -15,13 +15,14 @@ eframe = { version = "0.28.1", default-features = false, features = [
 ] }
 egui = "0.28.1"
 egui-phosphor = "0.6.0"
-# egui_dock = { version = "0.13.0", features = ["serde"] }
 egui_ext = { git = "https://github.com/kgv/egui_ext" }
 egui_extras = "0.28.1"
 egui_plot = "0.28.1"
 egui_tiles = "0.9.1"
+itertools = "0.13.0"
 # https://github.com/pola-rs/polars/issues/17192
 polars = { version = "0.43.0", features = [
+    "dtype-i16",
     "dtype-struct",
     "dtype-u16",
     "fmt_no_tty",
@@ -29,14 +30,7 @@ polars = { version = "0.43.0", features = [
     "round_series",
     "serde",
 ], default-features = false }
-# polars = { git = "https://github.com/pola-rs/polars", rev = "21602ba8610ce16e7ba675998e84e238d8066c98", features = [
-#     "dtype-struct",
-#     "dtype-u16",
-#     "fmt_no_tty",
-#     "lazy",
-#     "round_series",
-#     "serde",
-# ], default-features = false }
+ron = "0.8.1"
 serde = { version = "1.0.210", features = ["derive"] }
 tracing = "0.1.40"
 uom = { version = "0.36.0", features = ["serde"] }

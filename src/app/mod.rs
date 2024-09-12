@@ -1,27 +1,42 @@
-use self::{
-    context::Context,
-    panes::{behavior::Behavior, Pane},
-};
+use self::panes::{behavior::Behavior, Pane};
+use crate::utils::TreeExt;
 use anyhow::Result;
-use eframe::{get_value, APP_KEY};
+use eframe::{get_value, set_value, APP_KEY};
 use egui::{
-    global_dark_light_mode_switch, menu::bar, warn_if_debug_build, Align, Align2, Button,
-    CentralPanel, Color32, DroppedFile, FontDefinitions, Id, LayerId, Layout, Order, RichText,
-    SidePanel, TextStyle, TopBottomPanel,
+    menu::bar, warn_if_debug_build, Align, Align2, CentralPanel, Color32, DroppedFile,
+    FontDefinitions, Id, LayerId, Layout, Order, RichText, ScrollArea, SidePanel, TextStyle,
+    TopBottomPanel,
 };
-use egui_ext::{DroppedFileExt, HoveredFileExt, WithVisuals};
-use egui_phosphor::{add_to_fonts, Variant};
-use egui_tiles::Tree;
+use egui_ext::{DroppedFileExt, HoveredFileExt, LightDarkButton};
+use egui_phosphor::{
+    add_to_fonts,
+    regular::{
+        ARROWS_CLOCKWISE, FLOPPY_DISK, GRID_FOUR, ROCKET, SIDEBAR_SIMPLE, SQUARE_SPLIT_HORIZONTAL,
+        SQUARE_SPLIT_VERTICAL, TABS, TRASH,
+    },
+    Variant,
+};
+use egui_tiles::{ContainerKind, Tile, Tree};
+use panes::table::TablePane;
 use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Write, str, time::Duration};
 use tracing::{error, info, trace};
 
+macro icon($icon:expr) {
+    RichText::new($icon).size(SIZE)
+}
+
+macro localize($text:literal) {
+    $text
+}
+
 /// IEEE 754-2008
 const MAX_PRECISION: usize = 16;
 const _NOTIFICATIONS_DURATION: Duration = Duration::from_secs(15);
+const SIZE: f32 = 32.0;
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct App {
     reactive: bool,
@@ -30,9 +45,17 @@ pub struct App {
     // Panes
     tree: Tree<Pane>,
     behavior: Behavior,
+}
 
-    // Context
-    context: Context,
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            reactive: true,
+            left_panel: true,
+            tree: Tree::empty("tree"),
+            behavior: Default::default(),
+        }
+    }
 }
 
 impl App {
@@ -79,21 +102,19 @@ impl App {
             (!input.raw.dropped_files.is_empty()).then_some(input.raw.dropped_files.clone())
         }) {
             info!(?dropped_files);
-            // self.docks.left.tabs.files = Files {
-            //     files,
-            //     ..self.docks.left.tabs.files
-            // };
-            // ctx.data_mut(|data| data.remove_by_type::<TomlParsed>());
-            for dropped in dropped_files {
+            for dropped_file in dropped_files {
                 // let data_frame: DataFrame = match dropped.extension().and_then(OsStr::to_str) {
                 //     Some("bin") => bincode::deserialize(&fs::read(&args.path)?)?,
                 //     Some("ron") => ron::de::from_str(&fs::read_to_string(&args.path)?)?,
                 //     _ => panic!("unsupported input file extension"),
                 // };
-                match bin(&dropped) {
+                match bin(&dropped_file) {
                     Ok(data_frame) => {
                         trace!(?data_frame);
-                        self.context.state.data_frames.push(data_frame);
+                        self.tree.insert_pane(Pane::Table(TablePane {
+                            data_frame,
+                            settings: Default::default(),
+                        }));
                     }
                     Err(error) => {
                         error!(%error);
@@ -130,22 +151,12 @@ impl App {
 
     // Central panel
     fn central_panel(&mut self, ctx: &egui::Context) {
-        CentralPanel::default()
-            .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.0))
-            .show(ctx, |ui| {
-                if self.context.state.data_frames.is_empty() {
-                    return;
-                }
-                DockArea::new(&mut self.dock)
-                    .id(Id::new("central_dock"))
-                    .style(Style::from_egui(&ctx.style()))
-                    .show_inside(
-                        ui,
-                        &mut CentralTabs {
-                            context: &mut self.context,
-                        },
-                    );
-            });
+        CentralPanel::default().show(ctx, |ui| {
+            self.tree.ui(&mut self.behavior, ui);
+            if let Some(id) = self.behavior.close.take() {
+                self.tree.tiles.remove(id);
+            }
+        });
     }
 
     // Left panel
@@ -153,58 +164,142 @@ impl App {
         SidePanel::left("left_panel")
             .frame(egui::Frame::side_top_panel(&ctx.style()))
             .resizable(true)
-            .show_animated(ctx, true, |ui| SettingsTab::new(&mut self.context).view(ui));
+            .show_animated(ctx, self.left_panel, |ui| {
+                ScrollArea::vertical().show(ui, |ui| {
+                    self.behavior.settings(ui, &mut self.tree);
+                    ui.separator();
+                });
+            });
     }
 
     // Top panel
     fn top_panel(&mut self, ctx: &egui::Context) {
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             bar(ui, |ui| {
-                ui.visuals_mut().button_frame = false;
-                global_dark_light_mode_switch(ui);
+                // Left panel
+                ui.toggle_value(&mut self.left_panel, icon!(SIDEBAR_SIMPLE))
+                    .on_hover_text(localize!("left_panel"));
+                ui.separator();
+                ui.light_dark_button(SIZE);
+                ui.separator();
+                ui.toggle_value(&mut self.reactive, icon!(ROCKET))
+                    .on_hover_text("reactive")
+                    .on_hover_text(localize!("reactive_description_enabled"))
+                    .on_disabled_hover_text(localize!("reactive_description_disabled"));
                 ui.separator();
                 if ui
-                    .add(Button::new(RichText::new("🗑")))
-                    .on_hover_text("Reset data")
+                    .button(icon!(TRASH))
+                    .on_hover_text(localize!("reset_application"))
                     .clicked()
                 {
                     *self = Default::default();
                 }
-                // Reset gui
+                ui.separator();
                 if ui
-                    .add(Button::new(RichText::new("🔃")))
-                    .on_hover_text("Reset gui")
+                    .button(icon!(ARROWS_CLOCKWISE))
+                    .on_hover_text(localize!("reset_gui"))
                     .clicked()
                 {
-                    ui.with_visuals(|ui, _| ui.memory_mut(|memory| *memory = Default::default()));
-                }
-                // Organize windows
-                if ui
-                    .add(Button::new(RichText::new("▣")))
-                    .on_hover_text("Organize windows")
-                    .clicked()
-                {
-                    ui.ctx().memory_mut(|memory| memory.reset_areas());
+                    ui.memory_mut(|memory| *memory = Default::default());
                 }
                 ui.separator();
-                let mut central_tab = |tab| {
-                    let found = self.dock.find_tab(&tab);
-                    if ui
-                        .selectable_label(found.is_some(), tab.sign())
-                        .on_hover_text(tab.to_string())
-                        .clicked()
-                    {
-                        if let Some(index) = found {
-                            self.dock.remove_tab(index);
-                        } else {
-                            self.dock.push_to_focused_leaf(tab);
+                if ui
+                    .button(icon!(SQUARE_SPLIT_VERTICAL))
+                    .on_hover_text(localize!("vertical"))
+                    .clicked()
+                {
+                    if let Some(id) = self.tree.root {
+                        if let Some(Tile::Container(container)) = self.tree.tiles.get_mut(id) {
+                            container.set_kind(ContainerKind::Vertical);
                         }
                     }
-                };
-                // Table
-                central_tab(CentralTab::Table);
-                // Plot
-                central_tab(CentralTab::Plot);
+                }
+                if ui
+                    .button(icon!(SQUARE_SPLIT_HORIZONTAL))
+                    .on_hover_text(localize!("horizontal"))
+                    .clicked()
+                {
+                    if let Some(id) = self.tree.root {
+                        if let Some(Tile::Container(container)) = self.tree.tiles.get_mut(id) {
+                            container.set_kind(ContainerKind::Horizontal);
+                        }
+                    }
+                }
+                if ui
+                    .button(icon!(GRID_FOUR))
+                    .on_hover_text(localize!("grid"))
+                    .clicked()
+                {
+                    if let Some(id) = self.tree.root {
+                        if let Some(Tile::Container(container)) = self.tree.tiles.get_mut(id) {
+                            container.set_kind(ContainerKind::Grid);
+                        }
+                    }
+                }
+                if ui
+                    .button(icon!(TABS))
+                    .on_hover_text(localize!("tabs"))
+                    .clicked()
+                {
+                    if let Some(id) = self.tree.root {
+                        if let Some(Tile::Container(container)) = self.tree.tiles.get_mut(id) {
+                            container.set_kind(ContainerKind::Tabs);
+                        }
+                    }
+                }
+                ui.separator();
+                // Save
+                if ui.button(icon!(FLOPPY_DISK)).clicked() {
+                    // if let Err(error) = self.data.save("df.utca.ron") {
+                    //     error!(%error);
+                    // }
+                }
+                ui.separator();
+                // ui.visuals_mut().button_frame = false;
+                // global_dark_light_mode_switch(ui);
+                // ui.separator();
+                // if ui
+                //     .add(Button::new(RichText::new("🗑")))
+                //     .on_hover_text("Reset data")
+                //     .clicked()
+                // {
+                //     *self = Default::default();
+                // }
+                // // Reset gui
+                // if ui
+                //     .add(Button::new(RichText::new("🔃")))
+                //     .on_hover_text("Reset gui")
+                //     .clicked()
+                // {
+                //     ui.with_visuals(|ui, _| ui.memory_mut(|memory| *memory = Default::default()));
+                // }
+                // // Organize windows
+                // if ui
+                //     .add(Button::new(RichText::new("▣")))
+                //     .on_hover_text("Organize windows")
+                //     .clicked()
+                // {
+                //     ui.ctx().memory_mut(|memory| memory.reset_areas());
+                // }
+                // ui.separator();
+                // let mut central_tab = |tab| {
+                //     let found = self.dock.find_tab(&tab);
+                //     if ui
+                //         .selectable_label(found.is_some(), tab.sign())
+                //         .on_hover_text(tab.to_string())
+                //         .clicked()
+                //     {
+                //         if let Some(index) = found {
+                //             self.dock.remove_tab(index);
+                //         } else {
+                //             self.dock.push_to_focused_leaf(tab);
+                //         }
+                //     }
+                // };
+                // // Table
+                // central_tab(CentralTab::Table);
+                // // Plot
+                // central_tab(CentralTab::Plot);
             });
         });
     }
@@ -213,13 +308,16 @@ impl App {
 impl eframe::App for App {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
+        set_value(storage, APP_KEY, self);
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.panels(ctx);
         self.drag_and_drop(ctx);
+        if self.reactive {
+            ctx.request_repaint();
+        }
     }
 }
 
@@ -228,5 +326,5 @@ fn bin(dropped_file: &DroppedFile) -> Result<DataFrame> {
 }
 
 mod computers;
-mod context;
+mod data;
 mod panes;

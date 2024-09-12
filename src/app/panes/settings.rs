@@ -5,7 +5,7 @@ use uom::si::time::{millisecond, minute, second, Units};
 use crate::app::MAX_PRECISION;
 
 /// Settings
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) struct Settings {
     pub(crate) explode: bool,
     pub(crate) filter_null: bool,
@@ -95,10 +95,10 @@ impl Settings {
             ui.checkbox(&mut self.legend, "")
                 .on_hover_text("Show plot legend");
         });
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.visible, Some(true), "◉👁");
-            ui.selectable_value(&mut self.visible, Some(false), "◎👁");
-        });
+        // ui.horizontal(|ui| {
+        //     ui.selectable_value(&mut self.visible, Some(true), "◉👁");
+        //     ui.selectable_value(&mut self.visible, Some(false), "◎👁");
+        // });
     }
 }
 
@@ -126,7 +126,7 @@ impl Sort {
 }
 
 /// Mass to charge settings
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) struct MassToCharge {
     pub(crate) precision: usize,
 }
@@ -138,7 +138,7 @@ impl Default for MassToCharge {
 }
 
 /// Retention time settings
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) struct RetentionTime {
     pub(crate) precision: usize,
     pub(crate) units: TimeUnits,
@@ -154,7 +154,7 @@ impl Default for RetentionTime {
 }
 
 /// Time units
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum TimeUnits {
     Millisecond,
     #[default]

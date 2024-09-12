@@ -1,6 +1,8 @@
 use self::{
     behavior::Behavior,
+    plot::PlotPane,
     settings::{Settings, Sort, TimeUnits},
+    table::TablePane,
 };
 use crate::app::MAX_PRECISION;
 use egui::{ComboBox, DragValue, Ui};
@@ -10,46 +12,45 @@ use polars::frame::DataFrame;
 use serde::{Deserialize, Serialize};
 
 /// Pane
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub(crate) struct Pane {
-    data_frame: DataFrame,
-    settings: Settings,
-    kind: Kind,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) enum Pane {
+    Plot(PlotPane),
+    Table(TablePane),
 }
 
 impl Pane {
     pub(crate) const fn icon(&self) -> &str {
-        match self.kind {
-            Kind::Plot => CHART_BAR,
-            Kind::Table => TABLE,
+        match self {
+            Self::Plot(_) => CHART_BAR,
+            Self::Table(_) => TABLE,
         }
     }
 
     pub(crate) const fn title(&self) -> &'static str {
-        match self.kind {
-            Kind::Plot => "Plot",
-            Kind::Table => "Table",
+        match self {
+            Self::Plot(_) => "Plot",
+            Self::Table(_) => "Table",
         }
     }
 }
 
 impl Pane {
-    pub(crate) fn ui(&mut self, ui: &mut Ui) -> Option<Event> {}
+    pub(crate) fn ui(&mut self, ui: &mut Ui) {
+        match self {
+            Self::Plot(plot) => plot.ui(ui),
+            Self::Table(table) => table.ui(ui),
+        }
+    }
 
     pub(crate) fn settings(&mut self, ui: &mut Ui) {
-        self.settings.ui(ui)
+        match self {
+            Self::Plot(plot) => plot.settings.ui(ui),
+            Self::Table(table) => table.settings.ui(ui),
+        }
     }
 }
 
-/// Pane kind
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-pub(in crate::app) enum Kind {
-    Plot,
-    Table,
-}
-
 pub(crate) mod behavior;
+pub(crate) mod plot;
 pub(crate) mod settings;
 pub(crate) mod table;
-
-// pub(crate) mod central;

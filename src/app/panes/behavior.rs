@@ -1,6 +1,8 @@
+use crate::utils::ContainerExt;
+
 use super::Pane;
-use egui::{menu::bar, CollapsingHeader, RichText, Ui, WidgetText};
-use egui_phosphor::regular::LINK;
+use egui::{menu::bar, CollapsingHeader, CursorIcon, RichText, Ui, WidgetText};
+use egui_phosphor::regular::{LINK, X};
 use egui_tiles::{Tile, TileId, Tiles, Tree, UiResponse};
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,7 @@ const SIZE: f32 = 16.0;
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct Behavior {
     pub(crate) close: Option<TileId>,
-    pub(crate) toggle: Option<TileId>,
+    pub(crate) click: Option<TileId>,
 }
 
 impl Behavior {
@@ -20,7 +22,7 @@ impl Behavior {
             if let Some(Tile::Pane(pane)) = tree.tiles.get_mut(tile_id) {
                 ui.visuals_mut().collapsing_header_frame = true;
                 let open = self
-                    .toggle
+                    .click
                     .take_if(|toggle| *toggle == tile_id)
                     .map(|tile_id| {
                         let id = ui.make_persistent_id(tile_id);
@@ -63,23 +65,25 @@ impl egui_tiles::Behavior<Pane> for Behavior {
     }
 
     fn pane_ui(&mut self, ui: &mut Ui, tile_id: TileId, pane: &mut Pane) -> UiResponse {
-        match pane.ui(ui) {
-            Some(Event::Close) => {
-                self.close = Some(tile_id);
-                UiResponse::None
-            }
-            Some(Event::Toggle) => {
-                self.toggle = Some(tile_id);
-                UiResponse::None
-            }
-            Some(Event::Drag) => UiResponse::DragStarted,
-            None => UiResponse::None,
+        let response = ui
+            .horizontal(|ui| {
+                let response = ui.heading(pane.title()).on_hover_cursor(CursorIcon::Grab);
+                ui.add_space(ui.available_width() - ui.spacing().button_padding.x - SIZE);
+                ui.visuals_mut().button_frame = false;
+                if ui.button(RichText::new(X).size(SIZE)).clicked() {
+                    self.close = Some(tile_id);
+                }
+                response
+            })
+            .inner;
+        if response.clicked() {
+            self.click = Some(tile_id);
+        }
+        pane.ui(ui);
+        if response.dragged() {
+            UiResponse::DragStarted
+        } else {
+            UiResponse::None
         }
     }
-}
-
-/// Behavior settings
-#[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
-pub(crate) struct Settings {
-    pub(crate) link: bool,
 }
