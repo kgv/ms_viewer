@@ -13,12 +13,18 @@ pub(crate) struct Data {
 }
 
 impl Data {
-    pub(crate) fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        let contents = ron::ser::to_string_pretty(
-            &self.data_frame.select(["RetentionTime", "Masspectrum"])?,
-            Default::default(),
-        )?;
-        write(path, contents)?;
+    pub(crate) fn save(&self, path: impl AsRef<Path>, format: Format) -> Result<()> {
+        let data_frame = self.data_frame.select(["RetentionTime", "Masspectrum"])?;
+        match format {
+            Format::Bin => {
+                let contents = bincode::serialize(&data_frame)?;
+                write(path, contents)?;
+            }
+            Format::Ron => {
+                let contents = ron::ser::to_string_pretty(&data_frame, Default::default())?;
+                write(path, contents)?;
+            }
+        }
         Ok(())
     }
 }
@@ -44,4 +50,11 @@ impl Default for Data {
             ])),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) enum Format {
+    #[default]
+    Bin,
+    Ron,
 }

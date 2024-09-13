@@ -1,6 +1,7 @@
 use self::panes::{behavior::Behavior, Pane};
 use crate::utils::TreeExt;
 use anyhow::Result;
+use data::{Data, Format};
 use eframe::{get_value, set_value, APP_KEY};
 use egui::{
     menu::bar, warn_if_debug_build, Align, Align2, CentralPanel, Color32, DroppedFile,
@@ -250,7 +251,41 @@ impl App {
                 //
                 ui.separator();
                 // Save
-                if ui.button(icon!(FLOPPY_DISK)).clicked() {
+                ui.menu_button(icon!(FLOPPY_DISK), |ui| {
+                    if ui.button("RON").clicked() {
+                        for tile_id in self.tree.active_tiles() {
+                            if let Some(tile) = self.tree.tiles.get(tile_id) {
+                                match tile {
+                                    Tile::Pane(pane) => {
+                                        Data {
+                                            data_frame: pane.data_frame().clone(),
+                                        }
+                                        .save("df.msv.ron", Format::Ron)
+                                        .unwrap();
+                                    }
+                                    Tile::Container(container) => {}
+                                }
+                            }
+                        }
+                    }
+                    if ui.button("BIN").clicked() {
+                        for tile_id in self.tree.active_tiles() {
+                            if let Some(tile) = self.tree.tiles.get(tile_id) {
+                                match tile {
+                                    Tile::Pane(pane) => {
+                                        Data {
+                                            data_frame: pane.data_frame().clone(),
+                                        }
+                                        .save("df.msv.bin", Format::Ron)
+                                        .unwrap();
+                                    }
+                                    Tile::Container(container) => {}
+                                }
+                            }
+                        }
+                    }
+                });
+                {
                     // for tile_id in self.tree.active_tiles() {
                     //     if let Some(root) = self.tree.root() {
                     //         self.tree.
