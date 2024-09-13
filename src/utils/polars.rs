@@ -1,6 +1,27 @@
-use polars::{chunked_array::ChunkedArray, datatypes::PolarsDataType};
+use egui::WidgetText;
+use polars::{chunked_array::ChunkedArray, datatypes::PolarsDataType, series::Series};
 use std::fmt::{Display, Formatter, Result};
 
+// /// Extension methods for [`Series`]
+// trait SeriesExt {
+//     fn display(&self, fmt: impl Fn(T) -> U) -> FirstAndLast<T, U, impl Fn(T::Physical<'_>) -> U>;
+// }
+
+// impl<T: PolarsDataType, U: Display> ChunkedArrayExt<T, U> for &Series {
+//     fn display(&self, fmt: impl Fn(T) -> U) -> FirstAndLast<T, U, impl Fn(T::Physical<'_>) -> U> {
+//         FirstAndLast {
+//             chunked_array: self,
+//             fmt,
+//         }
+//     }
+// }
+
+// struct DisplayList {
+//     chunked_array: self,
+//     fmt,
+// }
+
+/// Extension methods for [`ChunkedArray`]
 pub trait ChunkedArrayExt<T: PolarsDataType, U: Display> {
     fn display(
         &self,
@@ -48,5 +69,13 @@ impl<T: PolarsDataType, U: Display, F: Fn(T::Physical<'_>) -> U> Display
         }
         write!(f, "]")?;
         Ok(())
+    }
+}
+
+impl<T: PolarsDataType, U: Display, F: Fn(T::Physical<'_>) -> U> From<FirstAndLast<'_, T, U, F>>
+    for WidgetText
+{
+    fn from(value: FirstAndLast<T, U, F>) -> Self {
+        value.to_string().into()
     }
 }

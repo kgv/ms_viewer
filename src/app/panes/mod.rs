@@ -61,6 +61,4 @@ pub(crate) mod behavior;
 pub(crate) mod plot;
 pub(crate) mod settings;
 pub(crate) mod table;
-
-pub(crate) mod eic;
-pub(crate) mod mass_spectrum;
+pub(crate) mod widgets;

@@ -19,67 +19,71 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
     fn compute(&mut self, key: Key<'_>) -> DataFrame {
         let mut data_frame = key.data_frame.clone();
         error!(?data_frame);
-        {
-            let data_frame = data_frame
-                .clone()
-                .lazy()
-                .explode(["Masspectrum"])
-                .unnest(["Masspectrum"])
-                //     .sort(["MassToCharge"], Default::default())
-                //     .group_by([col("RetentionTime")])
-                //     .agg([as_struct(vec![
-                //         col("MassToCharge").drop_nulls(),
-                //         col("Signal").drop_nulls(),
-                //     ])
-                //     .alias("Masspectrum")])
-                .collect()
-                .unwrap();
-            // // let contents = bincode::serialize(&data_frame).unwrap();
-            // // std::fs::write("df.msv.bin", &contents).unwrap();
-            // // let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
-            // // std::fs::write("df.msv.ron", &contents).unwrap();
-            error!(?data_frame);
-        }
+        // {
+        //     let data_frame = data_frame
+        //         .clone()
+        //         .lazy()
+        //         .select([
+        //             col("RetentionTime"),
+        //             col("Masspectrum").alias("MassSpectrum"),
+        //         ])
+        //         // .explode(["Masspectrum"])
+        //         // .unnest(["Masspectrum"])
+        //         //     .sort(["MassToCharge"], Default::default())
+        //         //     .group_by([col("RetentionTime")])
+        //         //     .agg([as_struct(vec![
+        //         //         col("MassToCharge").drop_nulls(),
+        //         //         col("Signal").drop_nulls(),
+        //         //     ])
+        //         //     .alias("MassSpectrum")])
+        //         .collect()
+        //         .unwrap();
+        //     let contents = bincode::serialize(&data_frame).unwrap();
+        //     std::fs::write("df.msv.bin", &contents).unwrap();
+        //     // // let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
+        //     // // std::fs::write("df.msv.ron", &contents).unwrap();
+        //     error!(?data_frame);
+        // }
         let mut lazy_frame = data_frame.lazy();
         if key.settings.filter_null {
-            lazy_frame = lazy_frame.filter(col("Masspectrum").list().len().neq(lit(0)));
+            lazy_frame = lazy_frame.filter(col("MassSpectrum").list().len().neq(lit(0)));
         }
         match key.settings.sort {
             Sort::RetentionTime if key.settings.explode => {
                 lazy_frame = lazy_frame
-                    .explode(["Masspectrum"])
-                    .unnest(["Masspectrum"])
+                    .explode(["MassSpectrum"])
+                    .unnest(["MassSpectrum"])
                     .sort_by_exprs([col("RetentionTime")], Default::default());
             }
             Sort::RetentionTime => {
                 lazy_frame = lazy_frame
                     .with_columns([
-                        col("Masspectrum").list().len().name().suffix(".Count"),
-                        col("Masspectrum")
+                        col("MassSpectrum").list().len().name().suffix(".Count"),
+                        col("MassSpectrum")
                             .list()
                             .eval(col("").struct_().field_by_name("MassToCharge"), true)
                             .list()
                             .min()
                             .alias("MassToCharge.Min"),
-                        col("Masspectrum")
+                        col("MassSpectrum")
                             .list()
                             .eval(col("").struct_().field_by_name("MassToCharge"), true)
                             .list()
                             .max()
                             .alias("MassToCharge.Max"),
-                        col("Masspectrum")
+                        col("MassSpectrum")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
                             .min()
                             .alias("Signal.Min"),
-                        col("Masspectrum")
+                        col("MassSpectrum")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
                             .max()
                             .alias("Signal.Max"),
-                        col("Masspectrum")
+                        col("MassSpectrum")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
@@ -90,71 +94,63 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
             }
             Sort::MassToCharge if key.settings.explode => {
                 lazy_frame = lazy_frame
-                    .explode(["Masspectrum"])
-                    .unnest(["Masspectrum"])
+                    .explode(["MassSpectrum"])
+                    .unnest(["MassSpectrum"])
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
             Sort::MassToCharge => {
                 trace!(lazy_data_frame =? lazy_frame.clone().collect());
                 lazy_frame = lazy_frame
-                    .explode(["Masspectrum"])
-                    .unnest(["Masspectrum"])
-                    // .group_by([col("RetentionTime"), col("MassToCharge").round(0)])
-                    // .agg([col("Signal")])
-                    // .explode(["Signal"])
-                    // .sort_by_exprs(
-                    //     [col("MassToCharge"), col("RetentionTime")],
-                    //     Default::default(),
-                    // )
+                    .explode(["MassSpectrum"])
+                    .unnest(["MassSpectrum"])
+                    .sort_by_exprs([col("RetentionTime")], Default::default())
                     .group_by([col("MassToCharge").round(0)])
                     .agg([as_struct(vec![
                         col("RetentionTime").drop_nulls(),
                         col("Signal").drop_nulls(),
                     ])
-                    .alias("RetentionTime&Signal")])
-                    // .agg([col("RetentionTime"), col("Signal")])
+                    .alias("ExtractedIonChromatogram")])
+                    .sort_by_exprs([col("MassToCharge")], Default::default())
                     .with_columns([
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .len()
                             .name()
                             .suffix(".Count"),
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .eval(col("").struct_().field_by_name("RetentionTime"), true)
                             .list()
                             .min()
                             .alias("RetentionTime.Min"),
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .eval(col("").struct_().field_by_name("RetentionTime"), true)
                             .list()
                             .max()
                             .alias("RetentionTime.Max"),
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
                             .min()
                             .alias("Signal.Min"),
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
                             .max()
                             .alias("Signal.Max"),
-                        col("RetentionTime&Signal")
+                        col("ExtractedIonChromatogram")
                             .list()
                             .eval(col("").struct_().field_by_name("Signal"), true)
                             .list()
                             .sum()
                             .alias("Signal.Sum"),
-                    ])
-                    .sort_by_exprs([col("MassToCharge")], Default::default());
+                    ]);
             }
         };
         data_frame = lazy_frame.collect().unwrap();
-        // .unwrap_or(context.state.data_frames[context.state.index].clone());
         trace!(?data_frame);
         data_frame
     }

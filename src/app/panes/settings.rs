@@ -142,6 +142,44 @@ impl Default for MassToCharge {
     }
 }
 
+impl MassToCharge {
+    pub(crate) fn format(self, value: f32) -> MassToChargeFormat {
+        MassToChargeFormat {
+            value,
+            precision: Some(self.precision),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct MassToChargeFormat {
+    value: f32,
+    precision: Option<usize>,
+}
+
+impl MassToChargeFormat {
+    pub(crate) fn precision(self, precision: Option<usize>) -> Self {
+        Self { precision, ..self }
+    }
+}
+
+impl Display for MassToChargeFormat {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let value = self.value;
+        if let Some(precision) = self.precision {
+            write!(f, "{value:.precision$}")
+        } else {
+            write!(f, "{value}")
+        }
+    }
+}
+
+impl From<MassToChargeFormat> for WidgetText {
+    fn from(value: MassToChargeFormat) -> Self {
+        value.to_string().into()
+    }
+}
+
 /// Retention time settings
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub(crate) struct RetentionTime {
@@ -170,9 +208,9 @@ impl Default for RetentionTime {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct RetentionTimeFormat {
-    pub(crate) value: f32,
-    pub(crate) precision: Option<usize>,
-    pub(crate) units: TimeUnits,
+    value: f32,
+    precision: Option<usize>,
+    units: TimeUnits,
 }
 
 impl RetentionTimeFormat {
@@ -190,7 +228,7 @@ impl Display for RetentionTimeFormat {
             TimeUnits::Minute => time.get::<minute>(),
         };
         if let Some(precision) = self.precision {
-            write!(f, "{value:.*}", precision)
+            write!(f, "{value:.precision$}")
         } else {
             write!(f, "{value}")
         }
