@@ -74,11 +74,8 @@ impl TablePane {
                     // Mass to charge
                     row.left_align_col(|ui| {
                         if let Some(value) = mass_to_charge.get(row_index) {
-                            ui.label(format!(
-                                "{value:.*}",
-                                self.settings.mass_to_charge.precision,
-                            ))
-                            .on_hover_text(value.to_string());
+                            let formated = self.settings.mass_to_charge.format(value);
+                            ui.label(formated).on_hover_text(formated.precision(None));
                         } else {
                             ui.label("null");
                         }

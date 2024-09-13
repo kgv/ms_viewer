@@ -15,10 +15,10 @@ impl Widget for MassSpectrum<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let height = ui.spacing().interact_size.y;
         let width = ui.spacing().interact_size.x;
-        let masspectrum = self.data_frame["MassSpectrum"].list().unwrap();
-        let masspectrum_series = masspectrum.get_as_series(self.row_index).unwrap();
+        let mass_spectrum = self.data_frame["MassSpectrum"].list().unwrap();
+        let mass_spectrum_series = mass_spectrum.get_as_series(self.row_index).unwrap();
         ui.horizontal(|ui| {
-            ui.label(masspectrum_series.fmt_list())
+            ui.label(mass_spectrum_series.fmt_list())
                 .on_hover_ui(|ui| {
                     if let Ok(value) = &self.data_frame["MassSpectrum.Count"].get(self.row_index) {
                         ui.label(format!("Count: {value}"));
@@ -52,8 +52,8 @@ impl Widget for MassSpectrum<'_> {
             ui.add_space(space);
             ui.visuals_mut().button_frame = false;
             ui.menu_button(RichText::new(LIST), |ui| {
-                let total_rows = masspectrum_series.len();
-                let mass_to_charge_signal = masspectrum_series.struct_().unwrap();
+                let total_rows = mass_spectrum_series.len();
+                let mass_to_charge_signal = mass_spectrum_series.struct_().unwrap();
                 let mass_to_charge_series =
                     mass_to_charge_signal.field_by_name("MassToCharge").unwrap();
                 let signal_series = mass_to_charge_signal.field_by_name("Signal").unwrap();

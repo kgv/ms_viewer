@@ -17,17 +17,14 @@ pub(crate) struct PlotPane {
 
 impl PlotPane {
     pub(super) fn ui(&self, ui: &mut Ui) {
-        if let Err(error) = match self.settings.sort {
+        match self.settings.sort {
             Sort::RetentionTime if !self.settings.explode => self.grouped_by_retention_time(ui),
             Sort::MassToCharge if !self.settings.explode => self.grouped_by_mass_to_charge(ui),
             _ => unimplemented!(),
-        } {
-            error!(%error);
-            ui.label(error.to_string());
         }
     }
 
-    pub(super) fn grouped_by_mass_to_charge(&self, ui: &mut Ui) -> PolarsResult<()> {
+    pub(super) fn grouped_by_mass_to_charge(&self, ui: &mut Ui) {
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
                 data_frame: &self.data_frame,
@@ -35,9 +32,9 @@ impl PlotPane {
             })
         });
         // let points = data_frame.height();
-        let mass_to_charge = data_frame["MassToCharge"].f32()?;
-        let retention_time = data_frame["RetentionTime"].list()?;
-        let signal = data_frame["Signal"].list()?;
+        let mass_to_charge = data_frame["MassToCharge"].f32().unwrap();
+        let retention_time = data_frame["RetentionTime"].list().unwrap();
+        let signal = data_frame["Signal"].list().unwrap();
         ui.vertical_centered_justified(|ui| {
             // let id = ui.make_persistent_id("plot");
             // let plot_memory = PlotMemory::load(ui.ctx(), id);
@@ -202,19 +199,18 @@ impl PlotPane {
                 // }
             });
         });
-        Ok(())
     }
 
-    pub(super) fn grouped_by_retention_time(&self, ui: &mut Ui) -> PolarsResult<()> {
+    pub(super) fn grouped_by_retention_time(&self, ui: &mut Ui) {
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
                 data_frame: &self.data_frame,
                 settings: &self.settings,
             })
         });
-        let retention_time = data_frame["RetentionTime"].i32()?;
-        let mass_to_charge = data_frame["MassToCharge"].list()?;
-        let signal = data_frame["Signal.Sum"].i64()?;
+        let total_rows = data_frame.height();
+        let retention_time = data_frame["RetentionTime"].i32().unwrap();
+        let mass_spectrum = self.data_frame["MassSpectrum"].list().unwrap();
         let mut plot = Plot::new("plot")
             .y_axis_formatter(move |y, _| round_to_decimals(y.value, 5).to_string());
         if self.settings.legend {
@@ -238,26 +234,46 @@ impl PlotPane {
 
             // Bars
             let mut bars = Vec::new();
-            for (retention_time, _mass_to_charge, signal) in
-                zip(retention_time, zip(mass_to_charge, signal)).filter_map(
-                    |(retention_time, (mass_to_charge, signal))| {
-                        Some((retention_time?, mass_to_charge?, signal?))
-                    },
-                )
-            {
+            // for row_index in 0..total_rows {
+            //     let retention_time = retention_time.get(row_index).unwrap();
+            //     let mass_spectrum = mass_spectrum.get_as_series(row_index).unwrap();
+            //     let mass_spectrum = mass_spectrum.struct_().unwrap();
+            //     let mass_to_charge = mass_spectrum.field_by_name("MassToCharge").unwrap();
+            //     let mass_to_charge = mass_to_charge.f32().unwrap();
+            //     let signal = mass_spectrum.field_by_name("Signal").unwrap();
+            //     let signal = signal.u16().unwrap();
+            //     for (mass_to_charge, signal) in zip(mass_to_charge, signal) {
+            //         let mass_to_charge = mass_to_charge.unwrap();
+            //         let signal = signal.unwrap();
+            //         let bar =
+            //             Bar::new(retention_time as _, signal as _).name(mass_to_charge.to_string());
+            //         bars.push(bar);
+            //     }
+            // }
+            for (retention_time, mass_spectrum) in zip(retention_time, mass_spectrum) {
+                let retention_time = retention_time.unwrap();
+                let mass_spectrum = mass_spectrum.unwrap();
+                let mass_spectrum = mass_spectrum.struct_().unwrap();
+                let mass_to_charge = mass_spectrum.field_by_name("MassToCharge").unwrap();
+                let mass_to_charge = mass_to_charge.f32().unwrap();
+                let signal = mass_spectrum.field_by_name("Signal").unwrap();
+                let signal = signal.u16().unwrap();
                 // error!(retention_time, ?range_x);
                 let retention_time = retention_time as _;
-                if range_x.start().floor() <= retention_time
-                    && retention_time <= range_x.end().ceil()
-                {
-                    // error!(retention_time, ?range_x);
-                    let bar = Bar::new(retention_time, signal as _);
+                // if range_x.start().floor() <= retention_time
+                //     && retention_time <= range_x.end().ceil()
+                // {
+                for (mass_to_charge, signal) in zip(mass_to_charge, signal) {
+                    let mass_to_charge = mass_to_charge.unwrap();
+                    let signal = signal.unwrap();
+                    let bar =
+                        Bar::new(retention_time, signal as _).name(mass_to_charge.to_string());
                     bars.push(bar);
                 }
+                // }
             }
             let chart = BarChart::new(bars);
             ui.bar_chart(chart);
         });
-        Ok(())
     }
 }
