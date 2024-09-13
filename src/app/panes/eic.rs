@@ -1,10 +1,10 @@
+use super::settings::Settings;
 use anyhow::{Error, Result};
 use egui::{Direction, Layout, Response, RichText, Ui, Widget};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular::LIST;
 use polars::prelude::*;
 use uom::si::{f32::Time, time::millisecond};
-use super::settings::{Settings, };
 
 // https://en.wikipedia.org/wiki/Mass_chromatogram
 
@@ -92,9 +92,8 @@ impl Widget for ExtractedIonChromatogram<'_> {
                             row.col(|ui| {
                                 let retention_time = retention_time_series.i32().unwrap();
                                 let value = retention_time.get(row_index).unwrap();
-                                let formated = self.settings.retention_time.format(value);
-                                ui.label(formated.to_string()).on_hover_text(value.to_string());
-                                ui.label(.to_string());
+                                let formated = self.settings.retention_time.format(value as _);
+                                ui.label(formated).on_hover_text(formated.precision(None));
                             });
                             // Signal
                             row.col(|ui| {

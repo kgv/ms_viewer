@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use egui::{ComboBox, DragValue, Ui};
+use egui::{ComboBox, DragValue, Ui, WidgetText};
 use serde::{Deserialize, Serialize};
 use uom::si::{
     f32::Time,
@@ -153,15 +153,7 @@ impl RetentionTime {
     pub(crate) fn format(self, value: f32) -> RetentionTimeFormat {
         RetentionTimeFormat {
             value,
-            precision: self.precision,
-            units: self.units,
-        }
-    }
-
-    pub(crate) fn precision(self, precision: usize) -> RetentionTimeFormat {
-        RetentionTimeFormat {
-            value,
-            precision: self.precision,
+            precision: Some(self.precision),
             units: self.units,
         }
     }
@@ -176,10 +168,17 @@ impl Default for RetentionTime {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct RetentionTimeFormat {
     pub(crate) value: f32,
-    pub(crate) precision: usize,
+    pub(crate) precision: Option<usize>,
     pub(crate) units: TimeUnits,
+}
+
+impl RetentionTimeFormat {
+    pub(crate) fn precision(self, precision: Option<usize>) -> Self {
+        Self { precision, ..self }
+    }
 }
 
 impl Display for RetentionTimeFormat {
@@ -190,7 +189,17 @@ impl Display for RetentionTimeFormat {
             TimeUnits::Second => time.get::<second>(),
             TimeUnits::Minute => time.get::<minute>(),
         };
-        write!(f, "{value:.*}", self.precision)
+        if let Some(precision) = self.precision {
+            write!(f, "{value:.*}", precision)
+        } else {
+            write!(f, "{value}")
+        }
+    }
+}
+
+impl From<RetentionTimeFormat> for WidgetText {
+    fn from(value: RetentionTimeFormat) -> Self {
+        value.to_string().into()
     }
 }
 
