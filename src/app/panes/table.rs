@@ -1,5 +1,6 @@
 use super::{
-    masspectrum::Masspectrum,
+    eic::ExtractedIonChromatogram,
+    mass_spectrum::MassSpectrum,
     settings::{Settings, Sort, TimeUnits},
 };
 use crate::{
@@ -39,6 +40,7 @@ impl TablePane {
     }
 
     fn grouped_by_mass_to_charge(&self, ui: &mut Ui) -> PolarsResult<()> {
+        let width = ui.spacing().interact_size.x;
         let height = ui.spacing().interact_size.y;
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
@@ -47,14 +49,12 @@ impl TablePane {
             })
         });
         let total_rows = data_frame.height();
-        let indices = data_frame["Index"].u32()?;
-        let mass_to_charge = data_frame["MassToCharge"].cast(&DataType::UInt32)?;
-        let mass_to_charge = mass_to_charge.u32()?;
-        let retention_time = data_frame["RetentionTime"].list()?;
-        let signal = data_frame["Signal"].list()?;
+        // let mass_to_charge = .cast(&DataType::UInt32)?;
+        let mass_to_charge = data_frame["MassToCharge"].f32()?;
         TableBuilder::new(ui)
             .cell_layout(Layout::centered_and_justified(Direction::LeftToRight))
-            .columns(Column::auto(), COLUMN_COUNT)
+            .column(Column::auto_with_initial_suggestion(width))
+            .columns(Column::auto(), COLUMN_COUNT - 1)
             .auto_shrink(false)
             .striped(true)
             .header(height, |mut row| {
@@ -76,9 +76,9 @@ impl TablePane {
                     let row_index = row.index();
                     // Index
                     row.col(|ui| {
-                        let index = indices.get(row_index).unwrap();
-                        ui.label(index.to_string());
+                        ui.label(row_index.to_string());
                     });
+                    // Mass to charge
                     row.left_align_col(|ui| {
                         if let Some(value) = mass_to_charge.get(row_index) {
                             ui.label(format!(
@@ -90,110 +90,118 @@ impl TablePane {
                             ui.label("null");
                         }
                     });
+                    // EIC
                     row.left_align_col(|ui| {
-                        if let Some(value) = retention_time.get_as_series(row_index) {
-                            let chunked_array = value.i32().unwrap();
-                            ui.label(
-                                chunked_array
-                                    .display(|value| {
-                                        let time = Time::new::<millisecond>(value as _);
-                                        let value = match self.settings.retention_time.units {
-                                            TimeUnits::Millisecond => time.get::<millisecond>(),
-                                            TimeUnits::Second => time.get::<second>(),
-                                            TimeUnits::Minute => time.get::<minute>(),
-                                        };
-                                        format!(
-                                            "{value:.*}",
-                                            self.settings.retention_time.precision,
-                                        )
-                                    })
-                                    .to_string(),
-                            )
-                            .on_hover_ui(|ui| {
-                                if let Ok(value) = &data_frame["RetentionTime.Count"].get(row_index)
-                                {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Count:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["RetentionTime.Min"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Min:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["RetentionTime.Max"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Max:");
-                                        ui.label(format!("{value}"));
-                                    });
-                                }
-                            })
-                            .context_menu(|ui| {
-                                if ui.button("🗐 Copy").clicked() {
-                                    // ui.output_mut(|output| {
-                                    //     output.copied_text = chunked_array.iter().join(", ")
-                                    // });
-                                };
-                                ui.separator();
-                                ScrollArea::vertical().show(ui, |ui| {
-                                    for value in chunked_array {
-                                        if let Some(value) = value {
-                                            let time = Time::new::<millisecond>(value as _);
-                                            let value = match self.settings.retention_time.units {
-                                                TimeUnits::Millisecond => time.get::<millisecond>(),
-                                                TimeUnits::Second => time.get::<second>(),
-                                                TimeUnits::Minute => time.get::<minute>(),
-                                            };
-                                            ui.label(format!(
-                                                "{value:.*}",
-                                                self.settings.retention_time.precision,
-                                            ));
-                                        }
-                                    }
-                                });
-                            });
-                        }
+                        ui.add(ExtractedIonChromatogram {
+                            data_frame: &data_frame,
+                            row_index,
+                            settings: self.settings,
+                        });
                     });
-                    row.left_align_col(|ui| {
-                        if let Some(value) = signal.get_as_series(row_index) {
-                            ui.label(value.fmt_list()).on_hover_ui(|ui| {
-                                if let Ok(value) = &data_frame["Signal.Count"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Count:");
-                                        ui.label(value.to_string());
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Min:");
-                                        ui.label(value.to_string());
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Max:");
-                                        ui.label(value.to_string());
-                                    });
-                                }
-                                if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Sum:");
-                                        ui.label(value.to_string());
-                                    });
-                                }
-                            });
-                        }
-                    });
+                    // row.left_align_col(|ui| {
+                    //     if let Some(retention_time_signal_series) =
+                    //         retention_time_signal.get_as_series(row_index)
+                    //     {
+                    //         // let retention_time_series = retention_time_signal_series
+                    //         //     .struct_()
+                    //         //     .unwrap()
+                    //         //     .field_by_name("RetentionTime")
+                    //         //     .unwrap();
+                    //         // let retention_time = retention_time_series.i32().unwrap();
+                    //         ui.label(
+                    //             retention_time
+                    //                 .display(|value| {
+                    //                     let time = Time::new::<millisecond>(value as _);
+                    //                     let value = match self.settings.retention_time.units {
+                    //                         TimeUnits::Millisecond => time.get::<millisecond>(),
+                    //                         TimeUnits::Second => time.get::<second>(),
+                    //                         TimeUnits::Minute => time.get::<minute>(),
+                    //                     };
+                    //                     format!(
+                    //                         "{value:.*}",
+                    //                         self.settings.retention_time.precision,
+                    //                     )
+                    //                 })
+                    //                 .to_string(),
+                    //         )
+                    //         .on_hover_ui(|ui| {
+                    //             if let Ok(count) =
+                    //                 &data_frame["RetentionTime&Signal.Count"].get(row_index)
+                    //             {
+                    //                 ui.label(format!("Count: {count}"));
+                    //             }
+                    //             if let Ok(min) = &data_frame["RetentionTime.Min"].get(row_index) {
+                    //                 ui.label(format!("Min: {min}"));
+                    //             }
+                    //             if let Ok(max) = &data_frame["RetentionTime.Max"].get(row_index) {
+                    //                 ui.label(format!("Max: {max}"));
+                    //             }
+                    //         })
+                    //         .context_menu(|ui| {
+                    //             // if ui.button("🗐 Copy").clicked() {
+                    //             //     // ui.output_mut(|output| {
+                    //             //     //     output.copied_text = chunked_array.iter().join(", ")
+                    //             //     // });
+                    //             // };
+                    //             // ui.separator();
+                    //             // ScrollArea::vertical().show(ui, |ui| {
+                    //             //     for value in chunked_array {
+                    //             //         if let Some(value) = value {
+                    //             //             let time = Time::new::<millisecond>(value as _);
+                    //             //             let value = match self.settings.retention_time.units {
+                    //             //                 TimeUnits::Millisecond => time.get::<millisecond>(),
+                    //             //                 TimeUnits::Second => time.get::<second>(),
+                    //             //                 TimeUnits::Minute => time.get::<minute>(),
+                    //             //             };
+                    //             //             ui.label(format!(
+                    //             //                 "{value:.*}",
+                    //             //                 self.settings.retention_time.precision,
+                    //             //             ));
+                    //             //         }
+                    //             //     }
+                    //             // });
+                    //         });
+                    //     }
+                    // });
+                    // Signal
+                    // row.left_align_col(|ui| {
+                    //     if let Some(value) = signal.get_as_series(row_index) {
+                    //         ui.label(value.fmt_list()).on_hover_ui(|ui| {
+                    //             if let Ok(value) = &data_frame["Signal.Count"].get(row_index) {
+                    //                 ui.horizontal(|ui| {
+                    //                     ui.label("Count:");
+                    //                     ui.label(value.to_string());
+                    //                 });
+                    //             }
+                    //             if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
+                    //                 ui.horizontal(|ui| {
+                    //                     ui.label("Min:");
+                    //                     ui.label(value.to_string());
+                    //                 });
+                    //             }
+                    //             if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
+                    //                 ui.horizontal(|ui| {
+                    //                     ui.label("Max:");
+                    //                     ui.label(value.to_string());
+                    //                 });
+                    //             }
+                    //             if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
+                    //                 ui.horizontal(|ui| {
+                    //                     ui.label("Sum:");
+                    //                     ui.label(value.to_string());
+                    //                 });
+                    //             }
+                    //         });
+                    //     }
+                    // });
                 });
             });
         Ok(())
     }
 
     fn grouped_by_retention_time(&self, ui: &mut Ui) -> PolarsResult<()> {
-        let height = ui.spacing().interact_size.y;
         let width = ui.spacing().interact_size.x;
+        let height = ui.spacing().interact_size.y;
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
                 data_frame: &self.data_frame,
@@ -201,9 +209,7 @@ impl TablePane {
             })
         });
         let total_rows = data_frame.height();
-        let indices = data_frame["Index"].u32()?;
         let retention_time = data_frame["RetentionTime"].i32()?;
-        let masspectrum = data_frame["Masspectrum"].list()?;
         TableBuilder::new(ui)
             .cell_layout(Layout::centered_and_justified(Direction::LeftToRight))
             .column(Column::auto_with_initial_suggestion(width))
@@ -215,10 +221,7 @@ impl TablePane {
                     ui.heading("Index");
                 });
                 row.col(|ui| {
-                    ui.heading(format!(
-                        "Retention time, {}",
-                        self.settings.retention_time.units.abbreviation(),
-                    ));
+                    ui.heading("Retention time");
                 });
                 row.col(|ui| {
                     ui.heading("Masspectrum");
@@ -229,8 +232,7 @@ impl TablePane {
                     let row_index = row.index();
                     // Index
                     row.col(|ui| {
-                        let index = indices.get(row_index).unwrap();
-                        ui.label(index.to_string());
+                        ui.label(row_index.to_string());
                     });
                     // Retention time
                     row.left_align_col(|ui| {
@@ -250,66 +252,10 @@ impl TablePane {
                     });
                     // Masspectrum
                     row.left_align_col(|ui| {
-                        ui.add(Masspectrum {
+                        ui.add(MassSpectrum {
                             data_frame: &data_frame,
                             row_index,
                         });
-                        // let mass_to_charge_signal_series =
-                        //     masspectrum.get_as_series(row_index).unwrap();
-                        // ui.menu_button(mass_to_charge_signal_series.fmt_list(), |ui| {
-                        //     let total_rows = mass_to_charge_signal_series.len();
-                        //     let mass_to_charge_signal =
-                        //         mass_to_charge_signal_series.struct_().unwrap();
-                        //     let mass_to_charge_series =
-                        //         mass_to_charge_signal.field_by_name("MassToCharge").unwrap();
-                        //     let signal_series =
-                        //         mass_to_charge_signal.field_by_name("Signal").unwrap();
-                        //     let mass_to_charge = mass_to_charge_series.f32().unwrap();
-                        //     let signal = signal_series.u16().unwrap();
-                        //     ScrollArea::vertical().show_rows(
-                        //         ui,
-                        //         height,
-                        //         total_rows,
-                        //         |ui, row_range| {
-                        //             for row_index in row_range {
-                        //                 let text = format!(
-                        //                     "{}: {} {}",
-                        //                     row_index + 1,
-                        //                     mass_to_charge.get(row_index).unwrap(),
-                        //                     signal.get(row_index).unwrap(),
-                        //                 );
-                        //                 ui.label(text);
-                        //             }
-                        //         },
-                        //     );
-                        // })
-                        // .response
-                        // .on_hover_ui(|ui| {
-                        //     if let Ok(value) = &data_frame["Masspectrum.Count"].get(row_index) {
-                        //         ui.label(format!("Count: {value}"));
-                        //     }
-                        // })
-                        // .on_hover_ui(|ui| {
-                        //     ui.heading("Mass to charge");
-                        //     if let Ok(value) = &data_frame["MassToCharge.Min"].get(row_index) {
-                        //         ui.label(format!("Min: {value}"));
-                        //     }
-                        //     if let Ok(value) = &data_frame["MassToCharge.Max"].get(row_index) {
-                        //         ui.label(format!("Max: {value}"));
-                        //     }
-                        // })
-                        // .on_hover_ui(|ui| {
-                        //     ui.heading("Signal");
-                        //     if let Ok(value) = &data_frame["Signal.Min"].get(row_index) {
-                        //         ui.label(format!("Min: {value}"));
-                        //     }
-                        //     if let Ok(value) = &data_frame["Signal.Max"].get(row_index) {
-                        //         ui.label(format!("Max: {value}"));
-                        //     }
-                        //     if let Ok(value) = &data_frame["Signal.Sum"].get(row_index) {
-                        //         ui.label(format!("Sum: {value}"));
-                        //     }
-                        // });
                     });
                     // // Mass to charge
                     // row.left_align_col(|ui| {
@@ -351,6 +297,7 @@ impl TablePane {
     }
 
     fn exploded(&self, ui: &mut Ui) -> PolarsResult<()> {
+        let width = ui.spacing().interact_size.x;
         let height = ui.spacing().interact_size.y;
         let data_frame = ui.memory_mut(|memory| {
             memory.caches.cache::<TableComputed>().get(TableKey {
@@ -359,13 +306,13 @@ impl TablePane {
             })
         });
         let total_rows = data_frame.height();
-        let indices = data_frame["Index"].u32()?;
         let retention_time = data_frame["RetentionTime"].i32()?;
         let mass_to_charge = data_frame["MassToCharge"].f32()?;
         let signal = data_frame["Signal"].u16()?;
         TableBuilder::new(ui)
             .cell_layout(Layout::centered_and_justified(Direction::LeftToRight))
-            .columns(Column::auto(), COLUMN_COUNT)
+            .column(Column::auto_with_initial_suggestion(width))
+            .columns(Column::auto(), COLUMN_COUNT - 1)
             .auto_shrink(false)
             .striped(true)
             .header(height, |mut row| {
@@ -373,10 +320,7 @@ impl TablePane {
                     ui.heading("Index");
                 });
                 let retention_time = |ui: &mut Ui| {
-                    ui.heading(format!(
-                        "Retention time, {}",
-                        self.settings.retention_time.units.abbreviation(),
-                    ));
+                    ui.heading("Retention time");
                 };
                 let mass_to_charge = |ui: &mut Ui| {
                     ui.heading("Mass to charge");
@@ -400,9 +344,9 @@ impl TablePane {
                     let row_index = row.index();
                     // Index
                     row.col(|ui| {
-                        let index = indices.get(row_index).unwrap();
-                        ui.label(index.to_string());
+                        ui.label(row_index.to_string());
                     });
+                    // RetentionTime & MassToCharge
                     let retention_time = |ui: &mut Ui| {
                         if let Some(value) = retention_time.get(row_index) {
                             let time = Time::new::<millisecond>(value as _);
@@ -437,6 +381,7 @@ impl TablePane {
                             row.left_align_col(retention_time);
                         }
                     }
+                    // Signal
                     row.left_align_col(|ui| {
                         if let Some(value) = signal.get(row_index) {
                             ui.label(format!("{value}"))

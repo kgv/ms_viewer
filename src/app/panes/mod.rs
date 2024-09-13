@@ -62,4 +62,5 @@ pub(crate) mod plot;
 pub(crate) mod settings;
 pub(crate) mod table;
 
-pub(crate) mod masspectrum;
+pub(crate) mod eic;
+pub(crate) mod mass_spectrum;

@@ -20,31 +20,31 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
         let mut data_frame = key.data_frame.clone();
         error!(?data_frame);
         {
-            // let data_frame = data_frame
-            //     .clone()
-            //     .lazy()
-            //     .explode(["Masspectrum"])
-            //     .unnest(["Masspectrum"])
-            //     .sort(["MassToCharge"], Default::default())
-            //     .group_by([col("RetentionTime")])
-            //     .agg([as_struct(vec![
-            //         col("MassToCharge").drop_nulls(),
-            //         col("Signal").drop_nulls(),
-            //     ])
-            //     .alias("Masspectrum")])
-            //     .collect()
-            //     .unwrap();
+            let data_frame = data_frame
+                .clone()
+                .lazy()
+                .explode(["Masspectrum"])
+                .unnest(["Masspectrum"])
+                //     .sort(["MassToCharge"], Default::default())
+                //     .group_by([col("RetentionTime")])
+                //     .agg([as_struct(vec![
+                //         col("MassToCharge").drop_nulls(),
+                //         col("Signal").drop_nulls(),
+                //     ])
+                //     .alias("Masspectrum")])
+                .collect()
+                .unwrap();
             // // let contents = bincode::serialize(&data_frame).unwrap();
             // // std::fs::write("df.msv.bin", &contents).unwrap();
             // // let contents = ron::ser::to_string_pretty(&data_frame, Default::default()).unwrap();
             // // std::fs::write("df.msv.ron", &contents).unwrap();
-            // error!(?data_frame);
+            error!(?data_frame);
         }
         let mut lazy_frame = data_frame.lazy();
         if key.settings.filter_null {
             lazy_frame = lazy_frame.filter(col("Masspectrum").list().len().neq(lit(0)));
         }
-        match Sort::RetentionTime {
+        match key.settings.sort {
             Sort::RetentionTime if key.settings.explode => {
                 lazy_frame = lazy_frame
                     .explode(["Masspectrum"])
@@ -97,29 +97,63 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
             Sort::MassToCharge => {
                 trace!(lazy_data_frame =? lazy_frame.clone().collect());
                 lazy_frame = lazy_frame
-                    .explode(["MassToCharge", "Signal"])
-                    .group_by([col("RetentionTime"), col("MassToCharge").round(0)])
-                    .agg([col("Signal")])
-                    .explode(["Signal"])
-                    .sort_by_exprs(
-                        [col("MassToCharge"), col("RetentionTime")],
-                        Default::default(),
-                    )
-                    .group_by([col("MassToCharge")])
-                    .agg([col("RetentionTime"), col("Signal")])
+                    .explode(["Masspectrum"])
+                    .unnest(["Masspectrum"])
+                    // .group_by([col("RetentionTime"), col("MassToCharge").round(0)])
+                    // .agg([col("Signal")])
+                    // .explode(["Signal"])
+                    // .sort_by_exprs(
+                    //     [col("MassToCharge"), col("RetentionTime")],
+                    //     Default::default(),
+                    // )
+                    .group_by([col("MassToCharge").round(0)])
+                    .agg([as_struct(vec![
+                        col("RetentionTime").drop_nulls(),
+                        col("Signal").drop_nulls(),
+                    ])
+                    .alias("RetentionTime&Signal")])
+                    // .agg([col("RetentionTime"), col("Signal")])
                     .with_columns([
-                        col("RetentionTime").list().len().name().suffix(".Count"),
-                        col("RetentionTime").list().min().name().suffix(".Min"),
-                        col("RetentionTime").list().max().name().suffix(".Max"),
-                        col("Signal").list().len().name().suffix(".Count"),
-                        col("Signal").list().min().name().suffix(".Min"),
-                        col("Signal").list().max().name().suffix(".Max"),
-                        col("Signal").list().sum().name().suffix(".Sum"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .len()
+                            .name()
+                            .suffix(".Count"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .eval(col("").struct_().field_by_name("RetentionTime"), true)
+                            .list()
+                            .min()
+                            .alias("RetentionTime.Min"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .eval(col("").struct_().field_by_name("RetentionTime"), true)
+                            .list()
+                            .max()
+                            .alias("RetentionTime.Max"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .min()
+                            .alias("Signal.Min"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .max()
+                            .alias("Signal.Max"),
+                        col("RetentionTime&Signal")
+                            .list()
+                            .eval(col("").struct_().field_by_name("Signal"), true)
+                            .list()
+                            .sum()
+                            .alias("Signal.Sum"),
                     ])
                     .sort_by_exprs([col("MassToCharge")], Default::default());
             }
         };
-        data_frame = lazy_frame.with_row_index("Index", None).collect().unwrap();
+        data_frame = lazy_frame.collect().unwrap();
         // .unwrap_or(context.state.data_frames[context.state.index].clone());
         trace!(?data_frame);
         data_frame

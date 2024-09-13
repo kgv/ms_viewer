@@ -1,6 +1,11 @@
+use std::fmt::{self, Display, Formatter};
+
 use egui::{ComboBox, DragValue, Ui};
 use serde::{Deserialize, Serialize};
-use uom::si::time::{millisecond, minute, second, Units};
+use uom::si::{
+    f32::Time,
+    time::{millisecond, minute, second, Units},
+};
 
 use crate::app::MAX_PRECISION;
 
@@ -144,12 +149,48 @@ pub(crate) struct RetentionTime {
     pub(crate) units: TimeUnits,
 }
 
+impl RetentionTime {
+    pub(crate) fn format(self, value: f32) -> RetentionTimeFormat {
+        RetentionTimeFormat {
+            value,
+            precision: self.precision,
+            units: self.units,
+        }
+    }
+
+    pub(crate) fn precision(self, precision: usize) -> RetentionTimeFormat {
+        RetentionTimeFormat {
+            value,
+            precision: self.precision,
+            units: self.units,
+        }
+    }
+}
+
 impl Default for RetentionTime {
     fn default() -> Self {
         Self {
             precision: 2,
             units: Default::default(),
         }
+    }
+}
+
+pub(crate) struct RetentionTimeFormat {
+    pub(crate) value: f32,
+    pub(crate) precision: usize,
+    pub(crate) units: TimeUnits,
+}
+
+impl Display for RetentionTimeFormat {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let time = Time::new::<millisecond>(self.value as _);
+        let value = match self.units {
+            TimeUnits::Millisecond => time.get::<millisecond>(),
+            TimeUnits::Second => time.get::<second>(),
+            TimeUnits::Minute => time.get::<minute>(),
+        };
+        write!(f, "{value:.*}", self.precision)
     }
 }
 

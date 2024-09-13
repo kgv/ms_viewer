@@ -1,8 +1,13 @@
-use crate::utils::ContainerExt;
+use std::mem::take;
 
-use super::Pane;
+use crate::{
+    app::{icon, localize},
+    utils::ContainerExt,
+};
+
+use super::{plot::PlotPane, table::TablePane, Pane};
 use egui::{menu::bar, CollapsingHeader, CursorIcon, RichText, Ui, WidgetText};
-use egui_phosphor::regular::{LINK, X};
+use egui_phosphor::regular::{CHART_BAR, LINK, TABLE, X};
 use egui_tiles::{Tile, TileId, Tiles, Tree, UiResponse};
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +40,37 @@ impl Behavior {
                 CollapsingHeader::new(RichText::new(pane.title()).heading())
                     .open(open)
                     .show(ui, |ui| {
+                        let text = match pane {
+                            Pane::Plot(_) => TABLE,
+                            Pane::Table(_) => CHART_BAR,
+                        };
+                        if ui
+                            .button(icon!(text).size(16.0))
+                            .on_hover_text(localize!("table"))
+                            .clicked()
+                        {
+                            *pane = match pane {
+                                Pane::Plot(PlotPane {
+                                    data_frame,
+                                    settings,
+                                }) => Pane::Table(TablePane {
+                                    data_frame: data_frame.clone(),
+                                    settings: *settings,
+                                }),
+                                Pane::Table(TablePane {
+                                    data_frame,
+                                    settings,
+                                }) => Pane::Plot(PlotPane {
+                                    data_frame: data_frame.clone(),
+                                    settings: *settings,
+                                }),
+                            };
+                            // if let Some(id) = self.tree.iter {
+                            //     // if let Some(Tile::Container(container)) = self.tree.tiles.get_mut(id) {
+                            //     //     container.set_kind(ContainerKind::Tabs);
+                            //     // }
+                            // }
+                        }
                         pane.settings(ui);
                     });
             }
@@ -70,7 +106,7 @@ impl egui_tiles::Behavior<Pane> for Behavior {
                 let response = ui.heading(pane.title()).on_hover_cursor(CursorIcon::Grab);
                 ui.add_space(ui.available_width() - ui.spacing().button_padding.x - SIZE);
                 ui.visuals_mut().button_frame = false;
-                if ui.button(RichText::new(X).size(SIZE)).clicked() {
+                if ui.button(RichText::new(X)).clicked() {
                     self.close = Some(tile_id);
                 }
                 response

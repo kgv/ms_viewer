@@ -12,7 +12,7 @@ use egui_phosphor::{
     add_to_fonts,
     regular::{
         ARROWS_CLOCKWISE, FLOPPY_DISK, GRID_FOUR, ROCKET, SIDEBAR_SIMPLE, SQUARE_SPLIT_HORIZONTAL,
-        SQUARE_SPLIT_VERTICAL, TABS, TRASH,
+        SQUARE_SPLIT_VERTICAL, TABLE, TABS, TRASH,
     },
     Variant,
 };
@@ -247,6 +247,7 @@ impl App {
                         }
                     }
                 }
+                //
                 ui.separator();
                 // Save
                 if ui.button(icon!(FLOPPY_DISK)).clicked() {
