@@ -18,6 +18,8 @@ pub(crate) struct Settings {
     pub(crate) retention_time: RetentionTime,
     pub(crate) sort: Sort,
 
+    pub(crate) normalize: bool,
+
     pub(crate) legend: bool,
     pub(crate) visible: Option<bool>,
 }
@@ -76,23 +78,29 @@ impl Settings {
         ui.horizontal(|ui| {
             ui.label("Sort");
             ComboBox::from_id_source("sort")
-                .selected_text(self.sort.display())
+                .selected_text(self.sort.text())
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
                         &mut self.sort,
                         Sort::RetentionTime,
-                        Sort::RetentionTime.display(),
+                        Sort::RetentionTime.text(),
                     )
                     .on_hover_text(Sort::RetentionTime.description());
                     ui.selectable_value(
                         &mut self.sort,
                         Sort::MassToCharge,
-                        Sort::MassToCharge.display(),
+                        Sort::MassToCharge.text(),
                     )
                     .on_hover_text(Sort::MassToCharge.description());
                 })
                 .response
                 .on_hover_text(self.sort.description());
+        });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Normalize");
+            ui.checkbox(&mut self.normalize, "")
+                .on_hover_text("Normalize");
         });
         ui.separator();
         ui.horizontal(|ui| {
@@ -115,7 +123,7 @@ pub(crate) enum Sort {
 }
 
 impl Sort {
-    pub(crate) fn display(&self) -> &'static str {
+    pub(crate) fn text(&self) -> &'static str {
         match self {
             Self::RetentionTime => "Retention time",
             Self::MassToCharge => "Mass to charge",

@@ -90,7 +90,8 @@ impl Widget for MassSpectrum<'_> {
                             });
                             // Signal
                             row.col(|ui| {
-                                let signal = signal_series.u16().unwrap();
+                                let signal = signal_series.cast(&DataType::Float64).unwrap();
+                                let signal = signal.f64().unwrap();
                                 ui.label(signal.get(row_index).unwrap().to_string());
                             });
                         });

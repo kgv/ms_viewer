@@ -48,6 +48,14 @@ impl ComputerMut<Key<'_>, DataFrame> for Computer {
         if key.settings.filter_null {
             lazy_frame = lazy_frame.filter(col("MassSpectrum").list().len().neq(lit(0)));
         }
+        if key.settings.normalize {
+            lazy_frame = lazy_frame
+                .explode(["MassSpectrum"])
+                .unnest(["MassSpectrum"])
+                .with_column(col("Signal").cast(DataType::Float32) / max("Signal"))
+                .group_by([col("RetentionTime")])
+                .agg([as_struct(vec![col("MassToCharge"), col("Signal")]).alias("MassSpectrum")]);
+        }
         match key.settings.sort {
             Sort::RetentionTime if key.settings.explode => {
                 lazy_frame = lazy_frame
